@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <title>Mirror Fight (Prototype)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <main id="app">
+    <!-- Start Screen -->
+    <section id="screen-start" class="screen">
+      <h1>Mirror Fight (Prototype)</h1>
+      <div class="button-column">
+        <button id="btnPlay" class="primary">Играть</button>
+        <button id="btnContinue" class="secondary">Продолжить</button>
+        <button id="btnJoin" class="secondary">Войти</button>
+        <button id="btnPractice" class="secondary">Тренировка</button>
+      </div>
+      <div id="start-info" class="info-panel">
+        <p>Карточный rogue-like с PvP-вторжением.</p>
+        <p>Сервер: <span id="serverUrl">ws://localhost:8787</span></p>
+        <p>Статус подключения: <span id="wsStatus">нет связи</span></p>
+      </div>
+    </section>
+
+    <!-- Join Screen -->
+    <section id="screen-join" class="screen hidden">
+      <h2>Войти как второй игрок</h2>
+      <label class="field">
+        <span>Код комнаты</span>
+        <input type="text" id="joinCode" maxlength="6" placeholder="ABC123" />
+      </label>
+      <div class="button-row">
+        <button id="btnJoinRoom" class="primary">Подключиться</button>
+        <button id="btnJoinBack" class="secondary">Назад</button>
+      </div>
+      <div id="joinStatus" class="info-panel"></div>
+    </section>
+
+    <!-- Hero Selection -->
+    <section id="screen-hero" class="screen hidden">
+      <h2>Выбор героя</h2>
+      <form id="heroForm" class="hero-grid">
+        <label class="hero-card">
+          <input type="radio" name="hero" value="mage" />
+          <div class="hero-body">
+            <h3>Маг</h3>
+            <p>HP: 24</p>
+            <p>Фокус на заклинаниях и контроле.</p>
+            <ul>
+              <li>Жар Пламени ×1</li>
+              <li>Морозный Удар ×1</li>
+              <li>Вспышка Ритма ×1</li>
+              <li>Светлая Помощь ×1</li>
+              <li>Щит Молний ×1</li>
+            </ul>
+          </div>
+        </label>
+        <label class="hero-card">
+          <input type="radio" name="hero" value="warrior" />
+          <div class="hero-body">
+            <h3>Воин</h3>
+            <p>HP: 28</p>
+            <p>Сбалансированные атаки и защита.</p>
+            <ul>
+              <li>Жар Пламени ×2</li>
+              <li>Морозный Удар ×1</li>
+              <li>Щит Молний ×1</li>
+              <li>Светлая Помощь ×1</li>
+            </ul>
+          </div>
+        </label>
+      </form>
+      <div class="button-row">
+        <button id="btnHeroBack" class="secondary">Назад</button>
+        <button id="btnHeroNext" class="primary">Далее</button>
+      </div>
+    </section>
+
+    <!-- Route Screen -->
+    <section id="screen-route" class="screen hidden">
+      <h2>Маршрут приключения</h2>
+      <p class="route-code">Код комнаты: <span id="routeRoomCode">—</span></p>
+      <div id="routeNodes" class="route">
+        <button data-node="0" class="route-node">1. Бой A</button>
+        <button data-node="1" class="route-node">2. Бонус</button>
+        <button data-node="2" class="route-node">3. Бой B</button>
+        <button data-node="3" class="route-node">4. Лут</button>
+        <button data-node="4" class="route-node">5. PvP</button>
+      </div>
+      <div class="button-row">
+        <button id="btnRouteMenu" class="secondary">В меню</button>
+      </div>
+      <div id="routeInfo" class="info-panel"></div>
+    </section>
+
+    <!-- Event Screen -->
+    <section id="screen-event" class="screen hidden">
+      <h2 id="eventTitle">Событие</h2>
+      <p id="eventDescription"></p>
+      <div id="eventOptions" class="option-grid"></div>
+      <div class="button-row">
+        <button id="btnEventBack" class="secondary">Отмена</button>
+      </div>
+    </section>
+
+    <!-- Battle Screen -->
+    <section id="screen-battle" class="screen hidden">
+      <div class="battle-header">
+        <div class="hp-card">
+          <h3>Игрок</h3>
+          <div class="hp-bar" data-side="player">
+            <div class="hp-fill" id="playerHpFill"></div>
+          </div>
+          <span id="playerHpText">0 / 0</span>
+        </div>
+        <div class="hp-card">
+          <h3>Оппонент</h3>
+          <div class="hp-bar" data-side="opponent">
+            <div class="hp-fill" id="opponentHpFill"></div>
+          </div>
+          <span id="opponentHpText">0 / 0</span>
+        </div>
+      </div>
+      <div id="battleStatus" class="info-panel"></div>
+      <div class="battle-board">
+        <div class="slots">
+          <h4>Ваши слоты</h4>
+          <div id="playerSlots" class="slot-row"></div>
+        </div>
+        <div class="slots opponent">
+          <h4>Слоты оппонента</h4>
+          <div id="opponentSlots" class="slot-row"></div>
+        </div>
+      </div>
+      <div class="card-panel">
+        <h4>Доступные карты</h4>
+        <div id="cardPool" class="card-pool"></div>
+      </div>
+      <div class="button-row battle-controls">
+        <button id="btnBattleReset" class="secondary">Сбросить</button>
+        <button id="btnBattleConfirm" class="primary">Подтвердить расклад</button>
+        <button id="btnBattleExit" class="secondary">Выйти</button>
+      </div>
+      <pre id="battleLog" class="battle-log"></pre>
+    </section>
+
+    <!-- Result Screen -->
+    <section id="screen-result" class="screen hidden">
+      <h2 id="resultTitle">Результат</h2>
+      <p id="resultSummary"></p>
+      <div class="button-row">
+        <button id="btnResultNext" class="primary">Далее</button>
+        <button id="btnResultRetry" class="secondary">Повторить</button>
+        <button id="btnResultMenu" class="secondary">В меню</button>
+      </div>
+    </section>
+  </main>
+
+  <footer id="globalStatus">
+    <span id="footerMessage">Добро пожаловать в Mirror Fight.</span>
+  </footer>
+
+  <script src="main.js"></script>
+</body>
+</html>
