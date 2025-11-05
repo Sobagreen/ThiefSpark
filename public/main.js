@@ -11,30 +11,12 @@ const SCREENS = {
 };
 
 const WS_URL = (() => {
-  const DEFAULT_REMOTE = 'wss://mazepark-1.onrender.com';
-
-  try {
-    const params = new URLSearchParams(window.location.search);
-    const override = params.get('ws');
-    if (override) {
-      if (override === 'local') {
-        const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
-        const port = window.location.port || '8787';
-        return `${protocol}://${window.location.hostname || 'localhost'}:${port}`;
-      }
-      return override;
-    }
-  } catch (err) {
-    // ignore invalid URLs and continue with defaults
+  if (window.location.hostname && window.location.hostname.includes('mazepark')) {
+    return 'wss://mazepark-1.onrender.com';
   }
-
-  if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-    const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
-    const port = window.location.port || '8787';
-    return `${protocol}://${window.location.hostname}:${port}`;
-  }
-
-  return DEFAULT_REMOTE;
+  const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
+  const port = window.location.port || '8787';
+  return `${protocol}://${window.location.hostname || 'localhost'}:${port}`;
 })();
 
 document.getElementById('serverUrl').textContent = WS_URL;
