@@ -22,6 +22,10 @@
         <p>Сервер: <span id="serverUrl">ws://localhost:8787</span></p>
         <p>Статус подключения: <span id="wsStatus">нет связи</span></p>
       </div>
+      <div id="playerDirectoryPanel" class="info-panel">
+        <h3>Игроки онлайн</h3>
+        <div id="playerDirectory" class="directory-list">Загрузка...</div>
+      </div>
     </section>
 
     <!-- Join Screen -->
@@ -54,6 +58,9 @@
               <li>Вспышка Ритма ×1</li>
               <li>Светлая Помощь ×1</li>
               <li>Щит Молний ×1</li>
+              <li>Искра Фокусировки ×1</li>
+              <li>Пелена Отражения ×1</li>
+              <li>Пылающий След ×1</li>
             </ul>
           </div>
         </label>
@@ -68,6 +75,9 @@
               <li>Морозный Удар ×1</li>
               <li>Щит Молний ×1</li>
               <li>Светлая Помощь ×1</li>
+              <li>Бастион Эха ×1</li>
+              <li>Искра Фокусировки ×1</li>
+              <li>Пылающий След ×1</li>
             </ul>
           </div>
         </label>
@@ -84,10 +94,10 @@
       <p class="route-code">Код комнаты: <span id="routeRoomCode">—</span></p>
       <div id="routeNodes" class="route">
         <button data-node="0" class="route-node">1. Бой A</button>
-        <button data-node="1" class="route-node">2. Бонус</button>
-        <button data-node="2" class="route-node">3. Бой B</button>
-        <button data-node="3" class="route-node">4. Лут</button>
-        <button data-node="4" class="route-node">5. PvP</button>
+        <button data-node="1" class="route-node">2. Бой B</button>
+        <button data-node="2" class="route-node">3. Бой C</button>
+        <button data-node="3" class="route-node">4. PvP</button>
+        <button data-node="4" class="route-node">5. Лагерь</button>
       </div>
       <div class="button-row">
         <button id="btnRouteMenu" class="secondary">В меню</button>
@@ -160,7 +170,25 @@
 
   <footer id="globalStatus">
     <span id="footerMessage">Добро пожаловать в Mirror Fight.</span>
+    <span id="footerRoom">Комната: —</span>
   </footer>
+
+  <div id="cardInfoOverlay" class="modal hidden">
+    <div class="modal-body">
+      <button id="cardInfoClose" class="modal-close" aria-label="Закрыть">×</button>
+      <h3 id="cardInfoTitle">Карта</h3>
+      <p id="cardInfoDescription" class="modal-description"></p>
+      <dl id="cardInfoStats" class="modal-stats"></dl>
+      <section class="modal-glossary">
+        <h4>Глоссарий</h4>
+        <ul id="cardInfoGlossary"></ul>
+      </section>
+      <div class="button-row">
+        <button id="cardInfoUse" class="primary">Разместить в следующий свободный слот</button>
+        <button id="cardInfoCancel" class="secondary">Закрыть</button>
+      </div>
+    </div>
+  </div>
 
   <script src="main.js"></script>
 </body>

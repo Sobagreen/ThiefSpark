@@ -139,6 +139,49 @@ const CARD_LIBRARY = {
     description: 'Лечение 3 HP',
     heal: 3
   },
+  ember: {
+    id: 'ember',
+    name: 'Пылающий След',
+    type: 'attack',
+    emoji: '🥊',
+    rarity: 'common',
+    once: false,
+    description: 'Атака 3 и дополнительное 1 прямого урона от ожога',
+    baseDamage: 3,
+    effect: 'burn'
+  },
+  bastion: {
+    id: 'bastion',
+    name: 'Бастион Эха',
+    type: 'defense',
+    emoji: '🛡️',
+    rarity: 'common',
+    once: false,
+    description: 'Плотный блок на 5 единиц',
+    block: 5,
+    reflect: 0
+  },
+  surge: {
+    id: 'surge',
+    name: 'Искра Фокусировки',
+    type: 'spell',
+    emoji: '✨',
+    rarity: 'common',
+    once: false,
+    description: '+1 к урону ваших карт до конца раунда',
+    effect: 'empower'
+  },
+  veil: {
+    id: 'veil',
+    name: 'Пелена Отражения',
+    type: 'spell',
+    emoji: '✨',
+    rarity: 'common',
+    once: false,
+    description: 'Снимает штрафы урона и даёт блок 2',
+    effect: 'cleanse',
+    block: 2
+  },
   power: {
     id: 'power',
     name: 'Взрыв Силы',
@@ -158,6 +201,17 @@ const CARD_LIBRARY = {
     once: true,
     description: 'Порядок слотов соперника меняется на 3→1',
     effect: 'reverse'
+  },
+  rupture: {
+    id: 'rupture',
+    name: 'Разлом Потока',
+    type: 'attack',
+    emoji: '🥊',
+    rarity: 'rare',
+    once: true,
+    description: 'Атака 5, ударяет дважды',
+    baseDamage: 5,
+    effect: 'doubleHit'
   },
   fate: {
     id: 'fate',
@@ -179,24 +233,45 @@ const CARD_LIBRARY = {
     description: '5 урона и вы первые в следующем раунде',
     baseDamage: 5,
     effect: 'wrath'
+  },
+  aegis: {
+    id: 'aegis',
+    name: 'Аегис Отголосков',
+    type: 'defense',
+    emoji: '🛡️',
+    rarity: 'legendary',
+    once: true,
+    description: 'Блок 6 и 3 ответного урона',
+    block: 6,
+    reflect: 3
   }
 };
+
+const CARD_GLOSSARY = [
+  { term: 'Блок', text: 'Поглощает входящий урон до указанного значения в текущем раунде.' },
+  { term: 'Ответный урон', text: 'Наносит прямой урон атакующему, если удар был заблокирован.' },
+  { term: 'Приоритет', text: 'Переносит ход вашей следующей карты на первое место раунда.' },
+  { term: 'Модификатор урона', text: 'Суммарная поправка к урону карт до конца раунда.' },
+  { term: 'Ожог', text: 'Наносит прямой урон, игнорируя блок.' },
+  { term: 'Усиление', text: '+1 к урону до конца раунда. Складывается.' }
+];
 
 const HEROES = {
   mage: {
     id: 'mage',
     name: 'Маг',
     hp: 24,
-    deck: ['flame', 'frost', 'flash', 'heal', 'shield']
+    deck: ['flame', 'frost', 'flash', 'heal', 'shield', 'surge', 'veil', 'ember']
   },
   warrior: {
     id: 'warrior',
     name: 'Воин',
     hp: 28,
-    deck: ['flame', 'flame', 'frost', 'shield', 'heal']
+    deck: ['flame', 'flame', 'frost', 'shield', 'heal', 'bastion', 'surge', 'ember']
   }
 };
 
+// PvE ladder ensures три боя перед PvP для тестирования баланса.
 const ENEMY_PROFILES = {
   easy: {
     id: 'easy',
@@ -206,7 +281,7 @@ const ENEMY_PROFILES = {
       const lowHp = state.opponent.hp <= 8;
       const plan = [
         createEnemyCard(lowHp ? 'defense3' : 'attack3'),
-        createEnemyCard('defense3'),
+        createEnemyCard('empower'),
         createEnemyCard('attack2')
       ];
       return plan;
@@ -221,7 +296,20 @@ const ENEMY_PROFILES = {
       return [
         first,
         createEnemyCard('attack3'),
-        createEnemyCard('attack4')
+        createEnemyCard('flare')
+      ];
+    }
+  },
+  hard: {
+    id: 'hard',
+    name: 'Вершитель Эха',
+    hp: 26,
+    plan(state) {
+      const protect = state.player.hp > state.player.maxHp / 2 ? createEnemyCard('attack4') : createEnemyCard('defense5');
+      return [
+        protect,
+        createEnemyCard('spell_reduce'),
+        createEnemyCard('attack5')
       ];
     }
   }
@@ -230,6 +318,8 @@ const ENEMY_PROFILES = {
 // Enemy AI card factory
 function createEnemyCard(kind) {
   switch (kind) {
+    case 'attack5':
+      return { id: 'enemy_attack5', name: 'Разлом Эха', type: 'attack', emoji: '🥊', rarity: 'enemy', baseDamage: 5 };
     case 'attack4':
       return { id: 'enemy_attack4', name: 'Разрез Эха', type: 'attack', emoji: '🥊', rarity: 'enemy', baseDamage: 4 };
     case 'attack3':
@@ -238,8 +328,14 @@ function createEnemyCard(kind) {
       return { id: 'enemy_attack2', name: 'Укус', type: 'attack', emoji: '🥊', rarity: 'enemy', baseDamage: 2 };
     case 'defense3':
       return { id: 'enemy_defense3', name: 'Щит Тени', type: 'defense', emoji: '🛡️', rarity: 'enemy', block: 3, reflect: 0 };
+    case 'defense5':
+      return { id: 'enemy_defense5', name: 'Барьер Эха', type: 'defense', emoji: '🛡️', rarity: 'enemy', block: 5, reflect: 1 };
     case 'spell_reduce':
       return { id: 'enemy_reduce', name: 'Оковы Мороза', type: 'spell', emoji: '✨', rarity: 'enemy', effect: 'reduceOpponent' };
+    case 'empower':
+      return { id: 'enemy_empower', name: 'Пульс Силы', type: 'spell', emoji: '✨', rarity: 'enemy', effect: 'empower' };
+    case 'flare':
+      return { id: 'enemy_flare', name: 'Всполох Зеркала', type: 'attack', emoji: '🥊', rarity: 'enemy', baseDamage: 2, effect: 'burn' };
     default:
       return { id: 'enemy_pass', name: 'Пауза', type: 'spell', emoji: '✨', rarity: 'enemy', effect: 'none' };
   }
@@ -261,6 +357,7 @@ const state = {
   deck: [],
   routeIndex: 0,
   roomCode: null,
+  playerDirectory: [],
   pvp: {
     role: null,
     ready: false,
@@ -273,6 +370,7 @@ const state = {
 
 let socket = null;
 let reconnectTimeout = null;
+const ui = { cardPreview: null };
 
 // Utility functions -------------------------------------------------------
 function logDebug(...args) {
@@ -294,6 +392,122 @@ function setFooterMessage(msg) {
 
 function setWsStatus(status) {
   document.getElementById('wsStatus').textContent = status;
+}
+
+function updateRoomIndicator() {
+  const roomEl = document.getElementById('footerRoom');
+  if (!roomEl) return;
+  if (state.pvp.role === 'host' && state.roomCode) {
+    roomEl.textContent = `Комната: ${state.roomCode}`;
+  } else if (state.roomCode) {
+    roomEl.textContent = `Комната: ${state.roomCode}`;
+  } else {
+    roomEl.textContent = 'Комната: —';
+  }
+}
+
+// Player discovery keeps QA aware of connected testers in real time.
+function renderPlayerDirectory() {
+  const container = document.getElementById('playerDirectory');
+  if (!container) return;
+  if (!state.playerDirectory.length) {
+    container.textContent = 'Игроки не подключены.';
+    return;
+  }
+  container.innerHTML = '';
+  state.playerDirectory.forEach((entry) => {
+    const item = document.createElement('div');
+    item.className = 'directory-entry';
+    const heroName = entry.heroName || '—';
+    const stanceLabel = entry.stance === 'ambush' ? 'Засада' : 'Герой';
+    const roomLabel = entry.roomCode || '—';
+    const roomIndex = Number.isFinite(entry.routeIndex) ? entry.routeIndex + 1 : '—';
+    const title = document.createElement('strong');
+    title.textContent = `${heroName} (${stanceLabel})`;
+    const room = document.createElement('span');
+    room.textContent = `Маршрут: ${roomIndex}`;
+    const code = document.createElement('span');
+    code.textContent = `Код комнаты: ${roomLabel}`;
+    item.appendChild(title);
+    item.appendChild(room);
+    item.appendChild(code);
+    container.appendChild(item);
+  });
+}
+
+// Lobby telemetry helpers keep QA view updated without manual refresh.
+function determineStance() {
+  return state.pvp.role === 'guest' ? 'ambush' : 'hero';
+}
+
+function syncPlayerStatus(extra = {}) {
+  const payload = {
+    type: 'PLAYER_STATUS',
+    heroId: state.heroId,
+    heroName: state.heroId ? HEROES[state.heroId].name : null,
+    routeIndex: state.routeIndex,
+    roomCode: state.roomCode,
+    stance: determineStance(),
+    ...extra
+  };
+  if (!socket || socket.readyState !== WebSocket.OPEN) {
+    sendWhenReady(payload);
+  } else {
+    sendToServer(payload);
+  }
+}
+
+// Card inspection overlay ---------------------------------------------------
+function openCardInfo(instanceId) {
+  const instance = findCardInstance(instanceId);
+  if (!instance) return;
+  const overlay = document.getElementById('cardInfoOverlay');
+  const title = document.getElementById('cardInfoTitle');
+  const description = document.getElementById('cardInfoDescription');
+  const stats = document.getElementById('cardInfoStats');
+  const glossary = document.getElementById('cardInfoGlossary');
+  const useButton = document.getElementById('cardInfoUse');
+  const def = cardDefinitionForInstance(instance);
+  ui.cardPreview = instanceId;
+  title.textContent = `${def.emoji} ${def.name}`;
+  description.textContent = def.description || 'Описание отсутствует.';
+  stats.innerHTML = '';
+  const infoPairs = [];
+  infoPairs.push(['Тип', def.type === 'attack' ? 'Атака' : def.type === 'defense' ? 'Защита' : 'Заклинание']);
+  infoPairs.push(['Редкость', def.rarity === 'common' ? 'Обычная' : def.rarity === 'rare' ? 'Редкая' : 'Легендарная']);
+  infoPairs.push(['Одноразовая', def.once ? 'Да' : 'Нет']);
+  if (def.baseDamage) infoPairs.push(['Урон', String(def.baseDamage)]);
+  if (def.block) infoPairs.push(['Блок', String(def.block)]);
+  if (def.reflect) infoPairs.push(['Ответ', String(def.reflect)]);
+  if (def.heal) infoPairs.push(['Лечение', String(def.heal)]);
+  infoPairs.forEach(([label, value]) => {
+    const dt = document.createElement('dt');
+    dt.textContent = label;
+    const dd = document.createElement('dd');
+    dd.textContent = value;
+    stats.appendChild(dt);
+    stats.appendChild(dd);
+  });
+  glossary.innerHTML = '';
+  CARD_GLOSSARY.forEach((entry) => {
+    const li = document.createElement('li');
+    li.innerHTML = `<strong>${entry.term}:</strong> ${entry.text}`;
+    glossary.appendChild(li);
+  });
+  if (instance.inUse) {
+    useButton.disabled = true;
+    useButton.textContent = 'Карта уже размещена';
+  } else {
+    useButton.disabled = false;
+    useButton.textContent = 'Разместить в следующий свободный слот';
+  }
+  overlay.classList.remove('hidden');
+}
+
+function closeCardInfo() {
+  const overlay = document.getElementById('cardInfoOverlay');
+  overlay.classList.add('hidden');
+  ui.cardPreview = null;
 }
 
 function createCardInstance(cardId) {
@@ -327,6 +541,7 @@ function savePersistentState() {
   if (state.roomCode && state.pvp.role === 'host') {
     storageSet(STORAGE_KEYS.room, state.roomCode);
   }
+  syncPlayerStatus();
 }
 
 function clearPersistentState() {
@@ -375,6 +590,7 @@ function resetRun() {
   state.pvp.ready = false;
   savePersistentState();
   storageRemove(STORAGE_KEYS.room);
+  updateRoomIndicator();
 }
 
 function updateRouteUI() {
@@ -453,6 +669,7 @@ function handleServerMessage(msg) {
       savePersistentState();
       setFooterMessage(`Комната создана: ${msg.roomCode}`);
       updateRouteUI();
+      updateRoomIndicator();
       break;
     case 'JOINED':
       state.pvp.role = msg.role;
@@ -466,6 +683,8 @@ function handleServerMessage(msg) {
         showScreen('start');
       }
       updateRouteUI();
+      updateRoomIndicator();
+      syncPlayerStatus();
       break;
     case 'GUEST_JOINED':
       setFooterMessage('Гость подключился. Можно переходить к PvP.');
@@ -498,6 +717,10 @@ function handleServerMessage(msg) {
     case 'ERROR':
       setFooterMessage(`Ошибка: ${msg.message}`);
       updateBattleStatus(`Ошибка: ${msg.message}`);
+      break;
+    case 'PLAYER_DIRECTORY':
+      state.playerDirectory = Array.isArray(msg.players) ? msg.players : [];
+      renderPlayerDirectory();
       break;
     default:
       logDebug('Unhandled server message', msg);
@@ -823,9 +1046,11 @@ function renderCardPool() {
     const button = document.createElement('button');
     button.className = 'card-button';
     button.dataset.rarity = cardDef.rarity;
-    button.disabled = Boolean(inst.inUse);
+    if (inst.inUse) {
+      button.dataset.state = 'locked';
+    }
     button.innerHTML = `<span class="emoji">${cardDef.emoji}</span><span>${cardDef.name}</span>`;
-    button.addEventListener('click', () => assignCardToSlot(inst.instanceId));
+    button.addEventListener('click', () => openCardInfo(inst.instanceId));
     container.appendChild(button);
   });
 }
@@ -833,19 +1058,20 @@ function renderCardPool() {
 function assignCardToSlot(instanceId) {
   const battle = state.battle;
   const instance = findCardInstance(instanceId);
-  if (!instance || instance.inUse) return;
+  if (!instance || instance.inUse) return false;
   if (state.battle.mode === 'pvp' && state.pvp.ready) {
     setPvpReady(false);
   }
   const nextSlot = battle.player.slots.findIndex((slot) => slot === null);
   if (nextSlot === -1) {
     updateBattleStatus('Все три слота заняты. Очистите слот для замены.');
-    return;
+    return false;
   }
   battle.player.slots[nextSlot] = instance;
   instance.inUse = true;
   renderPlayerSlots();
   renderCardPool();
+  return true;
 }
 
 function clearPlayerSlot(index) {
@@ -1040,6 +1266,14 @@ function applyCardEffect(side, card, step) {
       if (def.effect === 'execute' && damage === 'executed') {
         updateBattleLog('Клинок Судьбы завершает бой!');
       }
+      if (def.effect === 'burn' && damage !== 'executed' && battle[target].hp > 0) {
+        applyDirectDamage(target, 1);
+        updateBattleLog('Ожог наносит 1 прямого урона.');
+      }
+      if (def.effect === 'doubleHit' && damage !== 'executed' && battle[target].hp > 0) {
+        applyDamage(target, total, side);
+        updateBattleLog('Разлом Потока наносит повторный удар!');
+      }
       markCardUsage(card);
       break;
     }
@@ -1069,6 +1303,19 @@ function applyCardEffect(side, card, step) {
           targetState.damageMod -= 1;
           updateBattleLog('Оппонент теряет 1 урона до конца раунда.');
           break;
+        case 'empower':
+          actorState.damageMod += 1;
+          updateBattleLog('Сила накапливается: +1 к урону до конца раунда.');
+          break;
+        case 'cleanse': {
+          const blockGain = def.block || 0;
+          actorState.damageMod = Math.max(0, actorState.damageMod);
+          if (blockGain) {
+            actorState.block = (actorState.block || 0) + blockGain;
+          }
+          updateBattleLog(`Отражение рассеивает штрафы${blockGain ? ` и даёт блок ${blockGain}.` : '.'}`);
+          break;
+        }
         case 'none':
           updateBattleLog('Пасс.');
           break;
@@ -1207,7 +1454,7 @@ function finishBattle() {
 
 function repeatBattle() {
   if (!state.battle) return;
-  if (['easy', 'medium'].includes(state.battle.mode)) {
+  if (['easy', 'medium', 'hard'].includes(state.battle.mode)) {
     startPveBattle(state.battle.mode);
   } else if (state.battle.mode === 'pvp') {
     startPvpBattle();
@@ -1221,26 +1468,26 @@ function handleRouteNode(nodeIndex) {
       startPveBattle('easy', 'campaign');
       break;
     case 1:
-      openHealingEvent();
-      break;
-    case 2:
       startPveBattle('medium', 'campaign');
       break;
+    case 2:
+      startPveBattle('hard', 'campaign');
+      break;
     case 3:
-      openLootEvent();
+      startPvPNode();
       break;
     case 4:
-      startPvPNode();
+      openCampEvent();
       break;
     default:
       break;
   }
 }
 
-function openHealingEvent() {
+function openCampEvent() {
   openEvent(
-    'Узел помощи',
-    'Энергия зеркала исцеляет или усиливает вас.',
+    'Лагерь зеркальщиков',
+    'Перед финалом можно перевести дух или усилить колоду.',
     [
       {
         text: 'Сияющий луч восполняет здоровье.',
@@ -1252,10 +1499,17 @@ function openHealingEvent() {
       },
       {
         text: 'Зеркальная тренировка открывает новую карту.',
-        button: 'Получить «Жар Пламени»',
+        button: 'Получить «Искра Фокусировки»',
         action: () => {
-          addCardToDeck('flame');
+          addCardToDeck('surge');
           updateRouteAfterEvent();
+        }
+      },
+      {
+        text: 'В тайнике нашли редкие карты.',
+        button: 'Выбрать карту',
+        action: () => {
+          openLootEvent();
         }
       }
     ]
@@ -1263,7 +1517,7 @@ function openHealingEvent() {
 }
 
 function openLootEvent() {
-  const lootCards = ['flame', 'power', 'disrupt', 'fate', 'wrath', 'flash', 'shield'];
+  const lootCards = ['flame', 'power', 'disrupt', 'rupture', 'fate', 'wrath', 'flash', 'shield', 'aegis', 'veil', 'ember'];
   const shuffled = lootCards.sort(() => Math.random() - 0.5);
   const options = shuffled.slice(0, 3).map((cardId) => {
     const card = CARD_LIBRARY[cardId];
@@ -1360,6 +1614,21 @@ function setupButtons() {
     repeatBattle();
   });
 
+  document.getElementById('cardInfoClose').addEventListener('click', closeCardInfo);
+  document.getElementById('cardInfoCancel').addEventListener('click', closeCardInfo);
+  document.getElementById('cardInfoOverlay').addEventListener('click', (event) => {
+    if (event.target === event.currentTarget) {
+      closeCardInfo();
+    }
+  });
+  document.getElementById('cardInfoUse').addEventListener('click', () => {
+    if (!ui.cardPreview) return;
+    const placed = assignCardToSlot(ui.cardPreview);
+    if (placed) {
+      closeCardInfo();
+    }
+  });
+
   document.querySelectorAll('#routeNodes .route-node').forEach((btn) => {
     btn.addEventListener('click', () => {
       handleRouteNode(Number(btn.dataset.node));
@@ -1376,6 +1645,9 @@ function init() {
   connectSocket();
   showScreen('start');
   updateRouteUI();
+  renderPlayerDirectory();
+  updateRoomIndicator();
+  syncPlayerStatus();
   if (state.heroId) {
     document.getElementById('btnContinue').disabled = false;
   } else {

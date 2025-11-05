@@ -109,6 +109,29 @@ button.primary:not(:disabled):hover {
   min-height: 40px;
 }
 
+#playerDirectoryPanel {
+  margin-top: 24px;
+}
+
+.directory-list {
+  margin-top: 12px;
+  display: grid;
+  gap: 8px;
+}
+
+.directory-entry {
+  background: rgba(30, 41, 59, 0.75);
+  border-radius: 10px;
+  padding: 12px 14px;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  display: grid;
+  gap: 4px;
+}
+
+.directory-entry strong {
+  color: var(--text);
+}
+
 .hero-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
@@ -347,6 +370,11 @@ button.primary:not(:disabled):hover {
   color: #fb923c;
 }
 
+.card-button[data-state="locked"] {
+  opacity: 0.65;
+  border-style: dashed;
+}
+
 .card-button:disabled {
   opacity: 0.35;
 }
@@ -380,6 +408,88 @@ footer#globalStatus {
   display: flex;
   justify-content: space-between;
   align-items: center;
+}
+
+#footerRoom {
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(2, 6, 23, 0.75);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  z-index: 50;
+}
+
+.modal .modal-body {
+  background: var(--panel-strong);
+  border-radius: 18px;
+  padding: 28px;
+  width: min(420px, 100%);
+  position: relative;
+  box-shadow: 0 24px 64px rgba(15, 23, 42, 0.6);
+}
+
+.modal.hidden {
+  display: none;
+}
+
+.modal-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  background: rgba(148, 163, 184, 0.2);
+  border-radius: 50%;
+  width: 32px;
+  height: 32px;
+  font-size: 18px;
+  line-height: 1;
+}
+
+.modal-description {
+  color: var(--text);
+}
+
+.modal-stats {
+  margin: 16px 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 12px;
+  color: var(--muted);
+}
+
+.modal-stats dt {
+  font-weight: 600;
+  color: var(--text);
+}
+
+.modal-stats dd {
+  margin: 0;
+}
+
+.modal-glossary {
+  margin-top: 16px;
+  padding: 12px;
+  background: rgba(15, 23, 42, 0.6);
+  border-radius: 12px;
+}
+
+.modal-glossary ul {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.modal-glossary li {
+  color: var(--muted);
+  font-size: 14px;
 }
 
 @media (max-width: 720px) {
