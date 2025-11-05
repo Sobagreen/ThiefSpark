@@ -53,7 +53,8 @@ const server = http.createServer((req, res) => {
 const wss = new WebSocket.Server({ server });
 
 const rooms = new Map(); // roomCode -> room state
-const clientMeta = new Map(); // ws -> {roomCode, role}
+const clientMeta = new Map(); // ws -> { roomCode, role, id }
+const playerDirectory = new Map(); // ws -> lobby metadata for QA view
 
 function generateRoomCode() {
   const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -87,6 +88,31 @@ function getRoom(role, ws) {
   return room;
 }
 
+function updateClientMeta(ws, updates) {
+  const meta = clientMeta.get(ws) || {};
+  clientMeta.set(ws, { ...meta, ...updates });
+  return clientMeta.get(ws);
+}
+
+function directorySnapshot() {
+  return Array.from(playerDirectory.values()).map((entry) => ({
+    id: entry.id,
+    heroId: entry.heroId || null,
+    heroName: entry.heroName || null,
+    routeIndex: typeof entry.routeIndex === 'number' ? entry.routeIndex : null,
+    roomCode: entry.roomCode || null,
+    stance: entry.stance || 'hero'
+  }));
+}
+
+// Broadcast keeps passive observers informed about who is online.
+function broadcastDirectory() {
+  const payload = { type: 'PLAYER_DIRECTORY', players: directorySnapshot() };
+  wss.clients.forEach((client) => {
+    send(client, payload);
+  });
+}
+
 function resetRoomForBattle(room) {
   room.ready = { host: false, guest: false };
   room.lastSlots = { host: [null, null, null], guest: [null, null, null] };
@@ -102,7 +128,8 @@ function safeCleanupRoom(code) {
   rooms.delete(code);
 }
 
-function detachClient(ws) {
+function detachClient(ws, options = {}) {
+  const { keepEntry = false } = options;
   const meta = clientMeta.get(ws);
   if (!meta) return;
   const room = rooms.get(meta.roomCode);
@@ -118,10 +145,37 @@ function detachClient(ws) {
     resetRoomForBattle(room);
     safeCleanupRoom(meta.roomCode);
   }
-  clientMeta.delete(ws);
+  if (keepEntry) {
+    const updatedMeta = updateClientMeta(ws, { roomCode: null, role: null });
+    const existing = playerDirectory.get(ws) || { id: updatedMeta.id };
+    playerDirectory.set(ws, {
+      id: existing.id,
+      heroId: existing.heroId || null,
+      heroName: existing.heroName || null,
+      routeIndex: existing.routeIndex ?? null,
+      roomCode: null,
+      stance: 'hero'
+    });
+  } else {
+    clientMeta.delete(ws);
+    playerDirectory.delete(ws);
+  }
+  broadcastDirectory();
 }
 
 wss.on('connection', (ws) => {
+  const clientId = `p${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+  updateClientMeta(ws, { id: clientId, roomCode: null, role: null });
+  playerDirectory.set(ws, {
+    id: clientId,
+    heroId: null,
+    heroName: null,
+    routeIndex: null,
+    roomCode: null,
+    stance: 'hero'
+  });
+  broadcastDirectory();
+
   ws.on('message', (raw) => {
     let msg;
     try {
@@ -134,6 +188,7 @@ wss.on('connection', (ws) => {
     switch (msg.type) {
       case 'HELLO': {
         send(ws, { type: 'HELLO_ACK', message: 'Welcome to Mirror Fight server' });
+        send(ws, { type: 'PLAYER_DIRECTORY', players: directorySnapshot() });
         break;
       }
       case 'CREATE_ROOM': {
@@ -147,7 +202,14 @@ wss.on('connection', (ws) => {
           timeoutHandle: null
         };
         rooms.set(code, room);
-        clientMeta.set(ws, { roomCode: code, role: 'host' });
+        updateClientMeta(ws, { roomCode: code, role: 'host' });
+        const directoryEntry = playerDirectory.get(ws);
+        if (directoryEntry) {
+          directoryEntry.roomCode = code;
+          directoryEntry.stance = 'hero';
+          playerDirectory.set(ws, directoryEntry);
+          broadcastDirectory();
+        }
         send(ws, { type: 'ROOM_CREATED', roomCode: code });
         send(ws, { type: 'JOINED', role: 'host', roomCode: code });
         break;
@@ -164,15 +226,50 @@ wss.on('connection', (ws) => {
           break;
         }
         room.guestWS = ws;
-        clientMeta.set(ws, { roomCode, role: 'guest' });
+        updateClientMeta(ws, { roomCode, role: 'guest' });
+        const directoryEntry = playerDirectory.get(ws);
+        if (directoryEntry) {
+          directoryEntry.roomCode = roomCode;
+          directoryEntry.stance = 'ambush';
+          playerDirectory.set(ws, directoryEntry);
+          broadcastDirectory();
+        }
         send(ws, { type: 'JOINED', role: 'guest', roomCode });
         if (room.hostWS) {
           send(room.hostWS, { type: 'GUEST_JOINED', roomCode });
         }
         break;
       }
+      case 'PLAYER_STATUS': {
+        const meta = clientMeta.get(ws);
+        if (!meta) {
+          send(ws, { type: 'ERROR', message: 'Нет метаданных игрока' });
+          break;
+        }
+        const prev = playerDirectory.get(ws) || { id: meta.id };
+        const hasRoomCode = Object.prototype.hasOwnProperty.call(msg, 'roomCode');
+        const resolvedRoomCode = hasRoomCode
+          ? typeof msg.roomCode === 'string' && msg.roomCode.length > 0
+            ? msg.roomCode
+            : null
+          : meta.roomCode || null;
+        const next = {
+          id: prev.id || meta.id,
+          heroId: msg.heroId || null,
+          heroName: msg.heroName || null,
+          routeIndex: Number.isInteger(msg.routeIndex) ? msg.routeIndex : null,
+          roomCode: resolvedRoomCode,
+          stance: msg.stance === 'ambush' ? 'ambush' : 'hero'
+        };
+        playerDirectory.set(ws, next);
+        if (hasRoomCode) {
+          updateClientMeta(ws, { roomCode: resolvedRoomCode });
+        }
+        broadcastDirectory();
+        break;
+      }
       case 'LEAVE_ROOM': {
-        detachClient(ws);
+        detachClient(ws, { keepEntry: true });
         break;
       }
       case 'PVP_READY': {
