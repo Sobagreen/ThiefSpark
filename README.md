@@ -21,6 +21,13 @@ client from `/public` and handles WebSocket traffic on the same port. Without th
 opening the HTML file directly or visiting the GitHub repository URL will not work because the
 WebSocket endpoint `ws://localhost:8787` is unreachable.
 
+## Using the hosted multiplayer server
+
+By default the client now connects to the shared production socket at
+`wss://mazepark-1.onrender.com`, which is the same service used by the previous prototype. You can
+override this by appending `?ws=local` (to force a connection to your locally running `server.js`) or
+`?ws=wss://example.com` (to test against a different endpoint) when opening `index.html`.
+
 ## Project structure
 
 ```
