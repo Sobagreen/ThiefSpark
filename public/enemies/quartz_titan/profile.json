@@ -1,0 +1,12 @@
+{
+  "id": "quartz_titan",
+  "name": "Кварцевый титан",
+  "hp": 28,
+  "tier": 3,
+  "description": "Тяжёлые удары и мощная защита.",
+  "assets": {
+    "base": "enemies/quartz_titan/skin.png",
+    "attack": "enemies/quartz_titan/attack.png",
+    "hurt": "enemies/quartz_titan/hurt.png"
+  }
+}

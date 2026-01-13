@@ -1,0 +1,19 @@
+{
+  "patterns": {
+    "opener": [
+      "guard",
+      "shatter",
+      "guard"
+    ],
+    "default": [
+      "fortify",
+      "slash",
+      "weaken"
+    ],
+    "enraged": [
+      "fortify",
+      "shatter",
+      "pierce"
+    ]
+  }
+}

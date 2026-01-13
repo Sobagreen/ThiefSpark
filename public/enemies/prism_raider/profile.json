@@ -1,0 +1,12 @@
+{
+  "id": "prism_raider",
+  "name": "Призматический налётчик",
+  "hp": 18,
+  "tier": 1,
+  "description": "Ворует свет, пробивая оборону лучами.",
+  "assets": {
+    "base": "enemies/prism_raider/skin.png",
+    "attack": "enemies/prism_raider/attack.png",
+    "hurt": "enemies/prism_raider/hurt.png"
+  }
+}

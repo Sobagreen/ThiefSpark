@@ -1,0 +1,12 @@
+{
+  "id": "shard_scout",
+  "name": "Осколочный разведчик",
+  "hp": 17,
+  "tier": 1,
+  "description": "Слаб в защите, но умеет сбивать ритм.",
+  "assets": {
+    "base": "enemies/shard_scout/skin.png",
+    "attack": "enemies/shard_scout/attack.png",
+    "hurt": "enemies/shard_scout/hurt.png"
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "patterns": {
+    "opener": [
+      "weaken",
+      "pierce",
+      "shatter"
+    ],
+    "default": [
+      "pierce",
+      "slash",
+      "mark"
+    ],
+    "enraged": [
+      "pierce",
+      "pierce",
+      "heavy"
+    ]
+  }
+}

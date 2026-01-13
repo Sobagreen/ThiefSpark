@@ -1,0 +1,12 @@
+{
+  "id": "mirror_whelp",
+  "name": "Зеркальный детёныш",
+  "hp": 16,
+  "tier": 1,
+  "description": "Юркий осколок, нападающий рывками.",
+  "assets": {
+    "base": "enemies/mirror_whelp/skin.png",
+    "attack": "enemies/mirror_whelp/attack.png",
+    "hurt": "enemies/mirror_whelp/hurt.png"
+  }
+}

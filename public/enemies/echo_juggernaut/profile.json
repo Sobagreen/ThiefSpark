@@ -1,0 +1,12 @@
+{
+  "id": "echo_juggernaut",
+  "name": "Гигант эха",
+  "hp": 30,
+  "tier": 3,
+  "description": "Финальный разрушитель, ставит метку перед финалом.",
+  "assets": {
+    "base": "enemies/echo_juggernaut/skin.png",
+    "attack": "enemies/echo_juggernaut/attack.png",
+    "hurt": "enemies/echo_juggernaut/hurt.png"
+  }
+}
