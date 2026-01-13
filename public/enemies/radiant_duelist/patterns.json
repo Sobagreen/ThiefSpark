@@ -1,0 +1,19 @@
+{
+  "patterns": {
+    "opener": [
+      "priority",
+      "slash",
+      "guard"
+    ],
+    "default": [
+      "slash",
+      "pierce",
+      "guard"
+    ],
+    "enraged": [
+      "pierce",
+      "slash",
+      "shatter"
+    ]
+  }
+}

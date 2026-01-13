@@ -202,6 +202,16 @@ const CARD_LIBRARY = {
     description: 'Порядок слотов соперника меняется на 3→1',
     effect: 'reverse'
   },
+  brand: {
+    id: 'brand',
+    name: 'Зеркальная метка',
+    type: 'spell',
+    emoji: '✨',
+    rarity: 'rare',
+    once: false,
+    description: 'Помечает цель: следующий ваш удар +2 урона',
+    effect: 'mark'
+  },
   rupture: {
     id: 'rupture',
     name: 'Разлом Потока',
@@ -253,7 +263,9 @@ const CARD_GLOSSARY = [
   { term: 'Приоритет', text: 'Переносит ход вашей следующей карты на первое место раунда.' },
   { term: 'Модификатор урона', text: 'Суммарная поправка к урону карт до конца раунда.' },
   { term: 'Ожог', text: 'Наносит прямой урон, игнорируя блок.' },
-  { term: 'Усиление', text: '+1 к урону до конца раунда. Складывается.' }
+  { term: 'Усиление', text: '+1 к урону до конца раунда. Складывается.' },
+  { term: 'Метка', text: 'Следующая атака по цели получает +2 урона.' },
+  { term: 'Пронзание', text: 'Игнорирует блок и наносит урон напрямую.' }
 ];
 
 const HEROES = {
@@ -271,74 +283,29 @@ const HEROES = {
   }
 };
 
-// PvE ladder ensures три боя перед PvP для тестирования баланса.
-const ENEMY_PROFILES = {
-  easy: {
-    id: 'easy',
-    name: 'Эхо-скиталец',
-    hp: 18,
-    plan(state) {
-      const lowHp = state.opponent.hp <= 8;
-      const plan = [
-        createEnemyCard(lowHp ? 'defense3' : 'attack3'),
-        createEnemyCard('empower'),
-        createEnemyCard('attack2')
-      ];
-      return plan;
-    }
-  },
-  medium: {
-    id: 'medium',
-    name: 'Страж отзвуков',
-    hp: 22,
-    plan(state) {
-      const first = state.opponent.hp <= 8 && Math.random() < 0.5 ? createEnemyCard('defense3') : createEnemyCard('spell_reduce');
-      return [
-        first,
-        createEnemyCard('attack3'),
-        createEnemyCard('flare')
-      ];
-    }
-  },
-  hard: {
-    id: 'hard',
-    name: 'Вершитель Эха',
-    hp: 26,
-    plan(state) {
-      const protect = state.player.hp > state.player.maxHp / 2 ? createEnemyCard('attack4') : createEnemyCard('defense5');
-      return [
-        protect,
-        createEnemyCard('spell_reduce'),
-        createEnemyCard('attack5')
-      ];
-    }
-  }
-};
+const ENEMY_DB = window.ENEMY_DB || { cards: {}, enemies: [] };
 
-// Enemy AI card factory
-function createEnemyCard(kind) {
-  switch (kind) {
-    case 'attack5':
-      return { id: 'enemy_attack5', name: 'Разлом Эха', type: 'attack', emoji: '🥊', rarity: 'enemy', baseDamage: 5 };
-    case 'attack4':
-      return { id: 'enemy_attack4', name: 'Разрез Эха', type: 'attack', emoji: '🥊', rarity: 'enemy', baseDamage: 4 };
-    case 'attack3':
-      return { id: 'enemy_attack3', name: 'Рывок Тени', type: 'attack', emoji: '🥊', rarity: 'enemy', baseDamage: 3 };
-    case 'attack2':
-      return { id: 'enemy_attack2', name: 'Укус', type: 'attack', emoji: '🥊', rarity: 'enemy', baseDamage: 2 };
-    case 'defense3':
-      return { id: 'enemy_defense3', name: 'Щит Тени', type: 'defense', emoji: '🛡️', rarity: 'enemy', block: 3, reflect: 0 };
-    case 'defense5':
-      return { id: 'enemy_defense5', name: 'Барьер Эха', type: 'defense', emoji: '🛡️', rarity: 'enemy', block: 5, reflect: 1 };
-    case 'spell_reduce':
-      return { id: 'enemy_reduce', name: 'Оковы Мороза', type: 'spell', emoji: '✨', rarity: 'enemy', effect: 'reduceOpponent' };
-    case 'empower':
-      return { id: 'enemy_empower', name: 'Пульс Силы', type: 'spell', emoji: '✨', rarity: 'enemy', effect: 'empower' };
-    case 'flare':
-      return { id: 'enemy_flare', name: 'Всполох Зеркала', type: 'attack', emoji: '🥊', rarity: 'enemy', baseDamage: 2, effect: 'burn' };
-    default:
-      return { id: 'enemy_pass', name: 'Пауза', type: 'spell', emoji: '✨', rarity: 'enemy', effect: 'none' };
+function getEnemyById(enemyId) {
+  return ENEMY_DB.enemies.find((enemy) => enemy.id === enemyId);
+}
+
+function createEnemyCardFromId(cardId) {
+  const def = ENEMY_DB.cards[cardId];
+  if (!def) {
+    return { id: `enemy_unknown_${cardId}`, name: 'Неизвестный ход', type: 'spell', emoji: '✨', rarity: 'enemy', effect: 'none' };
   }
+  return { ...def, id: `enemy_${cardId}`, rarity: 'enemy' };
+}
+
+function selectEnemyPattern(enemy, battle) {
+  if (!enemy) return ['guard', 'guard', 'guard'];
+  if (battle.round === 1 && enemy.patterns?.opener) {
+    return enemy.patterns.opener;
+  }
+  if (battle.opponent.hp <= battle.opponent.maxHp / 2 && enemy.patterns?.enraged) {
+    return enemy.patterns.enraged;
+  }
+  return enemy.patterns?.default || ['guard', 'slash', 'guard'];
 }
 
 // Persistent state keys
@@ -346,6 +313,8 @@ const STORAGE_KEYS = {
   hero: 'mf_hero',
   deck: 'mf_deck',
   route: 'mf_route_index',
+  routeNodes: 'mf_route_nodes',
+  runEffects: 'mf_run_effects',
   room: 'mf_room_code'
 };
 
@@ -356,6 +325,11 @@ const state = {
   heroMaxHp: 0,
   deck: [],
   routeIndex: 0,
+  routeNodes: [],
+  runEffects: {
+    openingBlock: 0,
+    openingStrike: 0
+  },
   roomCode: null,
   playerDirectory: [],
   pvp: {
@@ -536,6 +510,8 @@ function savePersistentState() {
     storageSet(STORAGE_KEYS.hero, state.heroId);
   }
   storageSet(STORAGE_KEYS.route, String(state.routeIndex));
+  storageSet(STORAGE_KEYS.routeNodes, JSON.stringify(state.routeNodes));
+  storageSet(STORAGE_KEYS.runEffects, JSON.stringify(state.runEffects));
   const deckPayload = state.deck.map((inst) => ({ cardId: inst.cardId, burned: inst.burned }));
   storageSet(STORAGE_KEYS.deck, JSON.stringify(deckPayload));
   if (state.roomCode && state.pvp.role === 'host') {
@@ -548,6 +524,8 @@ function clearPersistentState() {
   storageRemove(STORAGE_KEYS.hero);
   storageRemove(STORAGE_KEYS.deck);
   storageRemove(STORAGE_KEYS.route);
+  storageRemove(STORAGE_KEYS.routeNodes);
+  storageRemove(STORAGE_KEYS.runEffects);
   storageRemove(STORAGE_KEYS.room);
 }
 
@@ -555,6 +533,8 @@ function loadPersistentState() {
   const heroId = storageGet(STORAGE_KEYS.hero);
   const deckPayload = storageGet(STORAGE_KEYS.deck);
   const routeIndex = parseInt(storageGet(STORAGE_KEYS.route), 10);
+  const routeNodes = storageGet(STORAGE_KEYS.routeNodes);
+  const runEffects = storageGet(STORAGE_KEYS.runEffects);
   const roomCode = storageGet(STORAGE_KEYS.room);
   if (heroId && HEROES[heroId]) {
     state.heroId = heroId;
@@ -563,6 +543,21 @@ function loadPersistentState() {
   }
   if (!Number.isNaN(routeIndex)) {
     state.routeIndex = routeIndex;
+  }
+  if (routeNodes) {
+    try {
+      state.routeNodes = JSON.parse(routeNodes) || [];
+    } catch (err) {
+      logDebug('Failed to parse route nodes', err);
+    }
+  }
+  if (runEffects) {
+    try {
+      const parsed = JSON.parse(runEffects);
+      state.runEffects = { ...state.runEffects, ...parsed };
+    } catch (err) {
+      logDebug('Failed to parse run effects', err);
+    }
   }
   if (deckPayload) {
     try {
@@ -583,6 +578,8 @@ function resetRun() {
   state.heroMaxHp = 0;
   state.deck = [];
   state.routeIndex = 0;
+  state.routeNodes = [];
+  state.runEffects = { openingBlock: 0, openingStrike: 0 };
   state.roomCode = null;
   state.pvp.role = null;
   state.pvp.opponentReady = false;
@@ -593,14 +590,96 @@ function resetRun() {
   updateRoomIndicator();
 }
 
+function pickRandom(list) {
+  if (!list || list.length === 0) return null;
+  return list[Math.floor(Math.random() * list.length)];
+}
+
+function getEnemyByTier(tier) {
+  const pool = ENEMY_DB.enemies.filter((enemy) => enemy.tier === tier);
+  return pickRandom(pool) || pool[0] || null;
+}
+
+function buildRouteNodes() {
+  const tier1 = ENEMY_DB.enemies.filter((enemy) => enemy.tier === 1);
+  const tier2 = ENEMY_DB.enemies.filter((enemy) => enemy.tier === 2);
+  const tier3 = ENEMY_DB.enemies.filter((enemy) => enemy.tier === 3);
+  const eventPool = EVENT_LIBRARY.filter((event) => event.id !== 'camp');
+  const shuffledEvents = [...eventPool].sort(() => Math.random() - 0.5);
+  const eventA = shuffledEvents[0] || EVENT_LIBRARY[0];
+  const eventB = shuffledEvents[1] || eventA;
+  return [
+    { type: 'battle', enemyId: (pickRandom(tier1) || tier1[0] || getEnemyByTier(1))?.id },
+    { type: 'event', eventId: eventA.id },
+    { type: 'battle', enemyId: (pickRandom(tier2) || tier2[0] || getEnemyByTier(2))?.id },
+    { type: 'pvp' },
+    { type: 'event', eventId: 'camp' },
+    { type: 'battle', enemyId: (pickRandom(tier3) || tier3[0] || getEnemyByTier(3))?.id }
+  ].filter((node) => node.enemyId || node.type !== 'battle');
+}
+
+function ensureRouteNodes() {
+  if (!state.routeNodes.length) {
+    state.routeNodes = buildRouteNodes();
+  }
+}
+
+function describeRouteNode(node) {
+  if (!node) return '—';
+  if (node.type === 'battle') {
+    const enemy = getEnemyById(node.enemyId);
+    return `Бой: ${enemy ? enemy.name : 'Неизвестный враг'}`;
+  }
+  if (node.type === 'event') {
+    const event = EVENT_LIBRARY.find((entry) => entry.id === node.eventId);
+    return `Событие: ${event ? event.title : 'Неизвестное событие'}`;
+  }
+  if (node.type === 'pvp') {
+    return 'PvP-вторжение';
+  }
+  return 'Неизвестный узел';
+}
+
+function renderRouteNodes() {
+  const container = document.getElementById('routeNodes');
+  container.innerHTML = '';
+  state.routeNodes.forEach((node, index) => {
+    const button = document.createElement('button');
+    button.className = 'route-node';
+    button.dataset.node = String(index);
+    button.textContent = `${index + 1}. ${describeRouteNode(node)}`;
+    button.addEventListener('click', () => {
+      handleRouteNode(index);
+    });
+    container.appendChild(button);
+  });
+}
+
+function formatRunEffects() {
+  const effects = [];
+  if (state.runEffects.openingBlock) {
+    effects.push(`Стартовый блок: +${state.runEffects.openingBlock}`);
+  }
+  if (state.runEffects.openingStrike) {
+    effects.push(`Первый удар: +${state.runEffects.openingStrike} урона`);
+  }
+  if (!effects.length) {
+    return 'Без активных благословений.';
+  }
+  return effects.join('<br>');
+}
+
 function updateRouteUI() {
   document.getElementById('routeRoomCode').textContent = state.roomCode || '—';
   const info = document.getElementById('routeInfo');
-  if (state.routeIndex >= 5) {
+  ensureRouteNodes();
+  renderRouteNodes();
+  const totalNodes = state.routeNodes.length;
+  if (state.routeIndex >= totalNodes) {
     info.textContent = 'Маршрут завершён. Можно начать заново или заняться PvP.';
   } else {
-    const progress = Math.min(state.routeIndex + 1, 5);
-    info.textContent = `Текущий прогресс: узел ${progress} из 5.`;
+    const progress = Math.min(state.routeIndex + 1, totalNodes);
+    info.textContent = `Текущий прогресс: узел ${progress} из ${totalNodes}.`;
   }
   const buttons = document.querySelectorAll('#routeNodes .route-node');
   buttons.forEach((btn) => {
@@ -610,6 +689,27 @@ function updateRouteUI() {
     btn.classList.toggle('active', isActive);
     btn.classList.toggle('completed', nodeIndex < state.routeIndex);
   });
+  const nextLabel = document.getElementById('routeNextLabel');
+  if (nextLabel) {
+    if (state.routeIndex >= totalNodes) {
+      nextLabel.textContent = 'Маршрут завершён.';
+    } else {
+      nextLabel.textContent = describeRouteNode(state.routeNodes[state.routeIndex]);
+    }
+  }
+  const nextButton = document.getElementById('btnRouteNext');
+  if (nextButton) {
+    nextButton.disabled = state.routeIndex >= totalNodes;
+  }
+  const status = document.getElementById('routeStatus');
+  if (status) {
+    status.innerHTML = `
+      <div>Герой: <strong>${state.heroId ? HEROES[state.heroId].name : '—'}</strong></div>
+      <div>HP: <strong>${state.heroHp} / ${state.heroMaxHp}</strong></div>
+      <div>Колода: <strong>${state.deck.length}</strong> карт</div>
+      <div class="muted">${formatRunEffects()}</div>
+    `;
+  }
 }
 
 // WebSocket ---------------------------------------------------------------
@@ -749,6 +849,7 @@ function continueGame() {
     setFooterMessage('Нет сохранённого приключения.');
     return;
   }
+  ensureRouteNodes();
   state.heroHp = state.heroHp || HEROES[state.heroId].hp;
   state.heroMaxHp = HEROES[state.heroId].hp;
   showScreen('route');
@@ -768,6 +869,8 @@ function finalizeHeroSelection() {
   state.heroMaxHp = hero.hp;
   state.deck = hero.deck.map(createCardInstance);
   state.routeIndex = 0;
+  state.routeNodes = buildRouteNodes();
+  state.runEffects = { openingBlock: 0, openingStrike: 0 };
   savePersistentState();
   document.getElementById('btnContinue').disabled = false;
   showScreen('route');
@@ -775,6 +878,170 @@ function finalizeHeroSelection() {
 }
 
 // Event helpers -----------------------------------------------------------
+function adjustHeroHp(amount) {
+  state.heroHp = Math.max(0, Math.min(state.heroMaxHp, state.heroHp + amount));
+  savePersistentState();
+}
+
+function addRunEffect(key, amount) {
+  state.runEffects[key] = (state.runEffects[key] || 0) + amount;
+  savePersistentState();
+}
+
+function removeRandomCard() {
+  if (!state.deck.length) return null;
+  const index = Math.floor(Math.random() * state.deck.length);
+  const [removed] = state.deck.splice(index, 1);
+  savePersistentState();
+  return removed;
+}
+
+function addRandomCardByRarity(rarity) {
+  const candidates = Object.values(CARD_LIBRARY).filter((card) => card.rarity === rarity);
+  const pick = pickRandom(candidates);
+  if (!pick) return null;
+  addCardToDeck(pick.id);
+  return pick;
+}
+
+const EVENT_LIBRARY = [
+  {
+    id: 'mirror_fountain',
+    title: 'Зеркальный источник',
+    description: 'Сияющая вода обещает восстановление или усиление.',
+    buildOptions() {
+      return [
+        {
+          text: 'Вы пьёте воду и чувствуете прилив сил.',
+          button: '+4 HP',
+          action: () => {
+            adjustHeroHp(4);
+            updateRouteAfterEvent();
+          }
+        },
+        {
+          text: 'Сияние превращается в новую карту.',
+          button: 'Получить «Зеркальная метка»',
+          action: () => {
+            addCardToDeck('brand');
+            updateRouteAfterEvent();
+          }
+        },
+        {
+          text: 'Отражение оставляет защитный символ.',
+          button: 'Благословение: +1 блок в первом раунде',
+          action: () => {
+            addRunEffect('openingBlock', 1);
+            updateRouteAfterEvent();
+          }
+        }
+      ];
+    }
+  },
+  {
+    id: 'shard_market',
+    title: 'Рынок осколков',
+    description: 'Купцы меняют карты на редкие отголоски.',
+    buildOptions() {
+      return [
+        {
+          text: 'Вы обмениваете случайную карту на редкий отголосок.',
+          button: 'Обменять карту',
+          action: () => {
+            const removed = removeRandomCard();
+            if (removed) {
+              addRandomCardByRarity('rare');
+              setFooterMessage(`Обмен: ${CARD_LIBRARY[removed.cardId]?.name || 'карта'} → редкая.`);
+            }
+            updateRouteAfterEvent();
+          }
+        },
+        {
+          text: 'Тихий купец укрепляет вашу руку.',
+          button: '+1 к урону первого удара',
+          action: () => {
+            addRunEffect('openingStrike', 1);
+            updateRouteAfterEvent();
+          }
+        },
+        {
+          text: 'Выбираете безопасный вариант.',
+          button: '+2 HP',
+          action: () => {
+            adjustHeroHp(2);
+            updateRouteAfterEvent();
+          }
+        }
+      ];
+    }
+  },
+  {
+    id: 'echo_ritual',
+    title: 'Ритуал отголосков',
+    description: 'Шёпот просит принести жертву ради силы.',
+    buildOptions() {
+      return [
+        {
+          text: 'Вы принимаете благословение ритма.',
+          button: 'Получить «Вспышка Ритма»',
+          action: () => {
+            addCardToDeck('flash');
+            updateRouteAfterEvent();
+          }
+        },
+        {
+          text: 'Пульс энергии остаётся в руках.',
+          button: '+1 к урону первого удара',
+          action: () => {
+            addRunEffect('openingStrike', 1);
+            updateRouteAfterEvent();
+          }
+        },
+        {
+          text: 'Вы отказываетесь и берёте немного отдыха.',
+          button: '+3 HP',
+          action: () => {
+            adjustHeroHp(3);
+            updateRouteAfterEvent();
+          }
+        }
+      ];
+    }
+  },
+  {
+    id: 'camp',
+    title: 'Лагерь зеркальщиков',
+    description: 'Перед финалом можно перевести дух или усилить колоду.',
+    buildOptions() {
+      return [
+        {
+          text: 'Сияющий луч восполняет здоровье.',
+          button: '+4 HP',
+          action: () => {
+            adjustHeroHp(4);
+            updateRouteAfterEvent();
+          }
+        },
+        {
+          text: 'Зеркальная тренировка открывает новую карту.',
+          button: 'Получить «Искра Фокусировки»',
+          action: () => {
+            addCardToDeck('surge');
+            updateRouteAfterEvent();
+          }
+        },
+        {
+          text: 'В тайнике нашли редкие карты.',
+          button: 'Выбрать карту',
+          action: () => {
+            openLootEvent();
+          }
+        }
+      ];
+    }
+  }
+];
+
 function openEvent(title, description, options) {
   document.getElementById('eventTitle').textContent = title;
   document.getElementById('eventDescription').textContent = description;
@@ -798,6 +1065,15 @@ function openEvent(title, description, options) {
   showScreen('event');
 }
 
+function openEventById(eventId) {
+  const event = EVENT_LIBRARY.find((entry) => entry.id === eventId);
+  if (!event) {
+    setFooterMessage('Событие не найдено.');
+    return;
+  }
+  openEvent(event.title, event.description, event.buildOptions());
+}
+
 function closeEvent() {
   showScreen('route');
 }
@@ -811,17 +1087,21 @@ function addCardToDeck(cardId) {
 }
 
 // Battle management -------------------------------------------------------
-function startPveBattle(profileId, context = 'campaign') {
-  const profile = ENEMY_PROFILES[profileId];
+function startPveBattle(enemyId, context = 'campaign') {
+  const profile = getEnemyById(enemyId);
+  if (!profile) {
+    setFooterMessage('Враг не найден.');
+    return;
+  }
   const opponent = {
     name: profile.name,
     hp: profile.hp,
     maxHp: profile.hp,
     slots: [null, null, null],
-    profileId
+    profileId: profile.id
   };
   state.battle = {
-    mode: profileId,
+    mode: enemyId,
     opponent,
     player: {
       name: HEROES[state.heroId].name,
@@ -852,7 +1132,10 @@ function startPracticeBattle() {
     state.heroMaxHp = HEROES.mage.hp;
     state.deck = HEROES.mage.deck.map(createCardInstance);
   }
-  startPveBattle('easy', 'practice');
+  const foe = getEnemyByTier(1) || ENEMY_DB.enemies[0];
+  if (foe) {
+    startPveBattle(foe.id, 'practice');
+  }
 }
 
 function startPvpBattle() {
@@ -902,16 +1185,24 @@ function prepareNewRound() {
       reflect: 0,
       nextPriority: false,
       slotOrder: [0, 1, 2],
-      damageMod: 0
+      damageMod: 0,
+      marked: false,
+      strikeBonus: state.runEffects.openingStrike || 0
     },
     opponent: {
       block: 0,
       reflect: 0,
       nextPriority: false,
       slotOrder: [0, 1, 2],
-      damageMod: 0
+      damageMod: 0,
+      marked: false,
+      strikeBonus: 0
     }
   };
+  if (battle.round === 1 && state.runEffects.openingBlock) {
+    battle.temp.player.block += state.runEffects.openingBlock;
+    updateBattleLog(`Благословение: стартовый блок +${state.runEffects.openingBlock}.`);
+  }
   if (battle.mode !== 'pvp') {
     battle.opponent.slots = generateEnemySlots(battle);
   } else {
@@ -927,10 +1218,10 @@ function prepareNewRound() {
 }
 
 function generateEnemySlots(battle) {
-  const profile = ENEMY_PROFILES[battle.opponent.profileId];
-  if (!profile) return [null, null, null];
-  const planned = profile.plan({ opponent: battle.opponent, player: battle.player });
-  return planned;
+  const enemy = getEnemyById(battle.opponent.profileId);
+  if (!enemy) return [null, null, null];
+  const pattern = selectEnemyPattern(enemy, battle);
+  return pattern.map((cardId) => createEnemyCardFromId(cardId));
 }
 
 function renderBattle() {
@@ -938,11 +1229,15 @@ function renderBattle() {
   const opponentHpFill = document.getElementById('opponentHpFill');
   const playerHpText = document.getElementById('playerHpText');
   const opponentHpText = document.getElementById('opponentHpText');
+  const opponentName = document.getElementById('opponentName');
   const battle = state.battle;
   playerHpText.textContent = `${Math.max(0, battle.player.hp)} / ${battle.player.maxHp}`;
   opponentHpText.textContent = `${Math.max(0, battle.opponent.hp)} / ${battle.opponent.maxHp}`;
   playerHpFill.style.width = `${Math.max(0, (battle.player.hp / battle.player.maxHp) * 100)}%`;
   opponentHpFill.style.width = `${Math.max(0, (battle.opponent.hp / battle.opponent.maxHp) * 100)}%`;
+  if (opponentName) {
+    opponentName.textContent = battle.opponent.name || '—';
+  }
   renderPlayerSlots();
   renderOpponentSlots();
   renderCardPool();
@@ -1156,27 +1451,28 @@ function resolveRound() {
 
   for (let step = 0; step < 3; step += 1) {
     const order = determineStepOrder(step);
-    order.forEach((side) => {
+    for (const side of order) {
+      if (battle.status === 'finished') break;
       const slotIndex = getSlotIndexForSide(side, step);
       const card = getCardAtSlot(side, slotIndex);
       if (!card) {
         updateBattleLog(`${side === 'player' ? 'Игрок' : 'Оппонент'} — слот ${slotIndex + 1}: пусто.`);
-        return;
+        continue;
       }
       revealSlot(side, slotIndex, card);
-      applyCardEffect(side, card, step);
-      if (battle.player.hp <= 0 || battle.opponent.hp <= 0) {
-        return;
-      }
-    });
+      const finished = applyCardEffect(side, card, step);
+      if (finished) break;
+    }
     battle.temp.player.block = 0;
     battle.temp.player.reflect = 0;
     battle.temp.opponent.block = 0;
     battle.temp.opponent.reflect = 0;
-    if (battle.player.hp <= 0 || battle.opponent.hp <= 0) break;
+    if (battle.status === 'finished') break;
   }
 
-  concludeRound();
+  if (battle.status !== 'finished') {
+    concludeRound();
+  }
 }
 
 function determineStepOrder(step) {
@@ -1257,8 +1553,32 @@ function applyCardEffect(side, card, step) {
   switch (def.type) {
     case 'attack': {
       const base = def.baseDamage || 0;
-      const total = Math.max(0, base + actorState.damageMod);
-      const damage = def.effect === 'execute' ? attemptExecute(side, target) : applyDamage(target, total, side);
+      let total = Math.max(0, base + actorState.damageMod);
+      if (actor === 'player' && actorState.strikeBonus) {
+        total += actorState.strikeBonus;
+        updateBattleLog(`Первый удар усиливается на ${actorState.strikeBonus}.`);
+        actorState.strikeBonus = 0;
+      }
+      if (targetState.marked) {
+        total += 2;
+        targetState.marked = false;
+        updateBattleLog('Метка срабатывает: +2 урона.');
+      }
+      let damage = 0;
+      if (def.effect === 'execute') {
+        damage = attemptExecute(side, target);
+      } else if (def.effect === 'pierce') {
+        applyDirectDamage(target, total);
+        damage = total;
+        updateBattleLog('Пронзающий удар игнорирует блок.');
+      } else {
+        if (def.effect === 'break') {
+          const breakAmount = def.breakAmount || 2;
+          targetState.block = Math.max(0, targetState.block - breakAmount);
+          updateBattleLog(`Блок цели ослаблен на ${breakAmount}.`);
+        }
+        damage = applyDamage(target, total, side);
+      }
       if (def.apply === 'frost') {
         targetState.damageMod -= 1;
         updateBattleLog(`${side === 'player' ? 'Игрок' : 'Оппонент'} охлаждает цель: -1 к урону до конца раунда.`);
@@ -1273,6 +1593,11 @@ function applyCardEffect(side, card, step) {
       if (def.effect === 'doubleHit' && damage !== 'executed' && battle[target].hp > 0) {
         applyDamage(target, total, side);
         updateBattleLog('Разлом Потока наносит повторный удар!');
+      }
+      if (def.effect === 'drain' && damage && damage !== 'executed') {
+        const heal = Math.ceil((damage || 0) * (def.healRatio || 0.5));
+        battle[actor].hp = Math.min(battle[actor].maxHp, battle[actor].hp + heal);
+        updateBattleLog(`${side === 'player' ? 'Игрок' : 'Оппонент'} высасывает ${heal} HP.`);
       }
       markCardUsage(card);
       break;
@@ -1298,6 +1623,10 @@ function applyCardEffect(side, card, step) {
           applyDamage(target, Math.max(0, (def.baseDamage || 0) + actorState.damageMod), side);
           battle.nextRoundActive = side;
           updateBattleLog('Гнев Двух Стихий: вы будете первыми в следующем раунде.');
+          break;
+        case 'mark':
+          targetState.marked = true;
+          updateBattleLog('Цель помечена: следующий удар усилен.');
           break;
         case 'reduceOpponent':
           targetState.damageMod -= 1;
@@ -1337,7 +1666,7 @@ function applyCardEffect(side, card, step) {
       break;
   }
 
-  checkVictoryState();
+  return checkVictoryState();
 }
 
 function markCardUsage(card) {
@@ -1425,11 +1754,15 @@ function checkVictoryState() {
   const battle = state.battle;
   if (battle.player.hp <= 0 || battle.opponent.hp <= 0) {
     finishBattle();
+    return true;
   }
+  return false;
 }
 
 function finishBattle() {
   const battle = state.battle;
+  if (!battle || battle.status === 'finished') return;
+  battle.status = 'finished';
   const playerWon = battle.player.hp > 0 && battle.opponent.hp <= 0;
   const opponentWon = battle.opponent.hp > 0 && battle.player.hp <= 0;
   const resultTitle = document.getElementById('resultTitle');
@@ -1439,8 +1772,7 @@ function finishBattle() {
     resultSummary.textContent = 'Вы разгромили соперника.';
     state.heroHp = battle.player.hp;
     if (battle.context === 'campaign') {
-      state.routeIndex = Math.min(state.routeIndex + 1, 5);
-      savePersistentState();
+      advanceRoute();
     }
   } else if (opponentWon) {
     resultTitle.textContent = 'Поражение…';
@@ -1454,62 +1786,54 @@ function finishBattle() {
 
 function repeatBattle() {
   if (!state.battle) return;
-  if (['easy', 'medium', 'hard'].includes(state.battle.mode)) {
-    startPveBattle(state.battle.mode);
-  } else if (state.battle.mode === 'pvp') {
+  if (state.battle.mode === 'pvp') {
     startPvpBattle();
+  } else {
+    startPveBattle(state.battle.mode);
   }
 }
 
 // Route node handlers -----------------------------------------------------
 function handleRouteNode(nodeIndex) {
-  switch (nodeIndex) {
-    case 0:
-      startPveBattle('easy', 'campaign');
+  const node = state.routeNodes[nodeIndex];
+  if (!node || nodeIndex !== state.routeIndex) return;
+  switch (node.type) {
+    case 'battle':
+      startPveBattle(node.enemyId, 'campaign');
       break;
-    case 1:
-      startPveBattle('medium', 'campaign');
+    case 'event':
+      openEventById(node.eventId);
       break;
-    case 2:
-      startPveBattle('hard', 'campaign');
-      break;
-    case 3:
-      startPvPNode();
-      break;
-    case 4:
-      openCampEvent();
+    case 'pvp':
+      openPvpEvent();
       break;
     default:
       break;
   }
 }
 
-function openCampEvent() {
+function openPvpEvent() {
   openEvent(
-    'Лагерь зеркальщиков',
-    'Перед финалом можно перевести дух или усилить колоду.',
+    'Разлом зеркала',
+    'В расщелине мерцают силуэты других игроков. Войти в PvP или отразить фантом?',
     [
       {
-        text: 'Сияющий луч восполняет здоровье.',
-        button: '+3 HP',
+        text: 'Настоящее вторжение через зеркало.',
+        button: 'Войти в PvP',
         action: () => {
-          state.heroHp = Math.min(state.heroMaxHp, state.heroHp + 3);
-          updateRouteAfterEvent();
+          closeEvent();
+          startPvPNode();
         }
       },
       {
-        text: 'Зеркальная тренировка открывает новую карту.',
-        button: 'Получить «Искра Фокусировки»',
+        text: 'Если нет соперника, можно сразиться с отражением.',
+        button: 'Сразиться с фантомом',
         action: () => {
-          addCardToDeck('surge');
-          updateRouteAfterEvent();
-        }
-      },
-      {
-        text: 'В тайнике нашли редкие карты.',
-        button: 'Выбрать карту',
-        action: () => {
-          openLootEvent();
+          closeEvent();
+          const foe = getEnemyByTier(2) || ENEMY_DB.enemies[0];
+          if (foe) {
+            startPveBattle(foe.id, 'campaign');
+          }
         }
       }
     ]
@@ -1517,7 +1841,7 @@ function openCampEvent() {
 }
 
 function openLootEvent() {
-  const lootCards = ['flame', 'power', 'disrupt', 'rupture', 'fate', 'wrath', 'flash', 'shield', 'aegis', 'veil', 'ember'];
+  const lootCards = ['flame', 'power', 'disrupt', 'rupture', 'fate', 'wrath', 'flash', 'shield', 'aegis', 'veil', 'ember', 'brand'];
   const shuffled = lootCards.sort(() => Math.random() - 0.5);
   const options = shuffled.slice(0, 3).map((cardId) => {
     const card = CARD_LIBRARY[cardId];
@@ -1535,7 +1859,12 @@ function openLootEvent() {
 
 function updateRouteAfterEvent() {
   closeEvent();
-  state.routeIndex += 1;
+  advanceRoute();
+}
+
+function advanceRoute() {
+  const total = state.routeNodes.length;
+  state.routeIndex = Math.min(state.routeIndex + 1, total);
   savePersistentState();
   updateRouteUI();
 }
@@ -1558,7 +1887,8 @@ function startPvPNode() {
     log: [],
     temp: null,
     nextRoundActive: null,
-    timeoutReached: false
+    timeoutReached: false,
+    context: 'campaign'
   };
   document.getElementById('battleLog').textContent = 'Ожидание соперника...\n';
   renderBattle();
@@ -1596,6 +1926,9 @@ function setupButtons() {
   document.getElementById('btnRouteMenu').addEventListener('click', () => {
     showScreen('start');
   });
+  document.getElementById('btnRouteNext').addEventListener('click', () => {
+    handleRouteNode(state.routeIndex);
+  });
   document.getElementById('btnEventBack').addEventListener('click', closeEvent);
   document.getElementById('btnBattleReset').addEventListener('click', resetPlayerSlots);
   document.getElementById('btnBattleConfirm').addEventListener('click', confirmBattleSlots);
@@ -1629,11 +1962,6 @@ function setupButtons() {
     }
   });
 
-  document.querySelectorAll('#routeNodes .route-node').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      handleRouteNode(Number(btn.dataset.node));
-    });
-  });
 }
 
 // Initialization ----------------------------------------------------------

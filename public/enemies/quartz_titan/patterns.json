@@ -1,0 +1,19 @@
+{
+  "patterns": {
+    "opener": [
+      "fortify",
+      "heavy",
+      "guard"
+    ],
+    "default": [
+      "heavy",
+      "shatter",
+      "guard"
+    ],
+    "enraged": [
+      "heavy",
+      "pierce",
+      "heavy"
+    ]
+  }
+}

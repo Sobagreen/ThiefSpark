@@ -1,0 +1,19 @@
+{
+  "patterns": {
+    "opener": [
+      "weaken",
+      "flare",
+      "guard"
+    ],
+    "default": [
+      "flare",
+      "drain",
+      "weaken"
+    ],
+    "enraged": [
+      "flare",
+      "pierce",
+      "empower"
+    ]
+  }
+}

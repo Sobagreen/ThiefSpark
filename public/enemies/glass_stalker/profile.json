@@ -1,0 +1,12 @@
+{
+  "id": "glass_stalker",
+  "name": "Стеклянный охотник",
+  "hp": 20,
+  "tier": 2,
+  "description": "Любит метить цель перед серией ударов.",
+  "assets": {
+    "base": "enemies/glass_stalker/skin.png",
+    "attack": "enemies/glass_stalker/attack.png",
+    "hurt": "enemies/glass_stalker/hurt.png"
+  }
+}

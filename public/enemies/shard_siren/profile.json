@@ -1,0 +1,12 @@
+{
+  "id": "shard_siren",
+  "name": "Осколочная сирена",
+  "hp": 19,
+  "tier": 2,
+  "description": "Смешивает ослабления с пламенными ударами.",
+  "assets": {
+    "base": "enemies/shard_siren/skin.png",
+    "attack": "enemies/shard_siren/attack.png",
+    "hurt": "enemies/shard_siren/hurt.png"
+  }
+}

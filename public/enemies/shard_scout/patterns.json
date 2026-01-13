@@ -1,0 +1,19 @@
+{
+  "patterns": {
+    "opener": [
+      "jab",
+      "weaken",
+      "jab"
+    ],
+    "default": [
+      "slash",
+      "guard",
+      "jab"
+    ],
+    "enraged": [
+      "slash",
+      "pierce",
+      "jab"
+    ]
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "patterns": {
+    "opener": [
+      "mark",
+      "slash",
+      "jab"
+    ],
+    "default": [
+      "pierce",
+      "guard",
+      "slash"
+    ],
+    "enraged": [
+      "pierce",
+      "slash",
+      "shatter"
+    ]
+  }
+}

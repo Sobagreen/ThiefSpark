@@ -109,6 +109,22 @@ button.primary:not(:disabled):hover {
   min-height: 40px;
 }
 
+.info-panel.info-hint h3 {
+  margin-bottom: 8px;
+}
+
+.info-panel.info-hint ol {
+  margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 6px;
+  color: var(--text);
+}
+
+.muted {
+  color: var(--muted);
+}
+
 #playerDirectoryPanel {
   margin-top: 24px;
 }
@@ -183,6 +199,41 @@ button.primary:not(:disabled):hover {
   margin-top: 24px;
 }
 
+.route-layout {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.route-next {
+  background: rgba(30, 41, 59, 0.75);
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  border-radius: 14px;
+  padding: 18px;
+  display: grid;
+  gap: 12px;
+}
+
+.route-next button {
+  width: 100%;
+}
+
+.route-hint {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.route-status {
+  margin-top: 0;
+}
+
+.route-status h3 {
+  margin-top: 0;
+  margin-bottom: 8px;
+}
+
 .route-node {
   position: relative;
   padding: 16px 14px;
@@ -253,6 +304,21 @@ button.primary:not(:disabled):hover {
   background: rgba(15, 23, 42, 0.6);
   border-radius: 16px;
   padding: 16px;
+}
+
+.hp-subtitle {
+  margin: 6px 0 12px;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.battle-guide {
+  margin-top: 12px;
+  padding: 10px 14px;
+  background: rgba(56, 189, 248, 0.08);
+  border-radius: 10px;
+  font-size: 14px;
+  color: var(--text);
 }
 
 .hp-bar {

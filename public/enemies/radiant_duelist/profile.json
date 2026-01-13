@@ -1,0 +1,12 @@
+{
+  "id": "radiant_duelist",
+  "name": "Сияющий дуэлянт",
+  "hp": 21,
+  "tier": 2,
+  "description": "Берёт инициативу и отвечает выпадом.",
+  "assets": {
+    "base": "enemies/radiant_duelist/skin.png",
+    "attack": "enemies/radiant_duelist/attack.png",
+    "hurt": "enemies/radiant_duelist/hurt.png"
+  }
+}

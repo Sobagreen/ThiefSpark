@@ -1,0 +1,12 @@
+{
+  "id": "dusk_bastion",
+  "name": "Сумрачный бастион",
+  "hp": 23,
+  "tier": 2,
+  "description": "Медленно разгоняется и давит оборону.",
+  "assets": {
+    "base": "enemies/dusk_bastion/skin.png",
+    "attack": "enemies/dusk_bastion/attack.png",
+    "hurt": "enemies/dusk_bastion/hurt.png"
+  }
+}

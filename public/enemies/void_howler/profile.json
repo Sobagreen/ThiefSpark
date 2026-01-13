@@ -1,0 +1,12 @@
+{
+  "id": "void_howler",
+  "name": "Пустотный вой",
+  "hp": 25,
+  "tier": 3,
+  "description": "Разрывает защиту и усиливает удары.",
+  "assets": {
+    "base": "enemies/void_howler/skin.png",
+    "attack": "enemies/void_howler/attack.png",
+    "hurt": "enemies/void_howler/hurt.png"
+  }
+}
