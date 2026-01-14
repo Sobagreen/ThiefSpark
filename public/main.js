@@ -314,6 +314,9 @@ const STORAGE_KEYS = {
   deck: 'mf_deck',
   route: 'mf_route_index',
   routeNodes: 'mf_route_nodes',
+  routeMap: 'mf_route_map',
+  routeProgress: 'mf_route_progress',
+  routeCurrent: 'mf_route_current',
   runEffects: 'mf_run_effects',
   room: 'mf_room_code'
 };
@@ -325,7 +328,10 @@ const state = {
   heroMaxHp: 0,
   deck: [],
   routeIndex: 0,
-  routeNodes: [],
+  routeMap: null,
+  routeProgress: [],
+  routeCurrent: null,
+  routeSelection: null,
   runEffects: {
     openingBlock: 0,
     openingStrike: 0
@@ -419,7 +425,7 @@ function syncPlayerStatus(extra = {}) {
     type: 'PLAYER_STATUS',
     heroId: state.heroId,
     heroName: state.heroId ? HEROES[state.heroId].name : null,
-    routeIndex: state.routeIndex,
+    routeIndex: state.routeProgress.length,
     roomCode: state.roomCode,
     stance: determineStance(),
     ...extra
@@ -510,7 +516,9 @@ function savePersistentState() {
     storageSet(STORAGE_KEYS.hero, state.heroId);
   }
   storageSet(STORAGE_KEYS.route, String(state.routeIndex));
-  storageSet(STORAGE_KEYS.routeNodes, JSON.stringify(state.routeNodes));
+  storageSet(STORAGE_KEYS.routeMap, JSON.stringify(state.routeMap));
+  storageSet(STORAGE_KEYS.routeProgress, JSON.stringify(state.routeProgress));
+  storageSet(STORAGE_KEYS.routeCurrent, JSON.stringify(state.routeCurrent));
   storageSet(STORAGE_KEYS.runEffects, JSON.stringify(state.runEffects));
   const deckPayload = state.deck.map((inst) => ({ cardId: inst.cardId, burned: inst.burned }));
   storageSet(STORAGE_KEYS.deck, JSON.stringify(deckPayload));
@@ -525,6 +533,9 @@ function clearPersistentState() {
   storageRemove(STORAGE_KEYS.deck);
   storageRemove(STORAGE_KEYS.route);
   storageRemove(STORAGE_KEYS.routeNodes);
+  storageRemove(STORAGE_KEYS.routeMap);
+  storageRemove(STORAGE_KEYS.routeProgress);
+  storageRemove(STORAGE_KEYS.routeCurrent);
   storageRemove(STORAGE_KEYS.runEffects);
   storageRemove(STORAGE_KEYS.room);
 }
@@ -534,6 +545,9 @@ function loadPersistentState() {
   const deckPayload = storageGet(STORAGE_KEYS.deck);
   const routeIndex = parseInt(storageGet(STORAGE_KEYS.route), 10);
   const routeNodes = storageGet(STORAGE_KEYS.routeNodes);
+  const routeMap = storageGet(STORAGE_KEYS.routeMap);
+  const routeProgress = storageGet(STORAGE_KEYS.routeProgress);
+  const routeCurrent = storageGet(STORAGE_KEYS.routeCurrent);
   const runEffects = storageGet(STORAGE_KEYS.runEffects);
   const roomCode = storageGet(STORAGE_KEYS.room);
   if (heroId && HEROES[heroId]) {
@@ -543,13 +557,6 @@ function loadPersistentState() {
   }
   if (!Number.isNaN(routeIndex)) {
     state.routeIndex = routeIndex;
-  }
-  if (routeNodes) {
-    try {
-      state.routeNodes = JSON.parse(routeNodes) || [];
-    } catch (err) {
-      logDebug('Failed to parse route nodes', err);
-    }
   }
   if (runEffects) {
     try {
@@ -570,6 +577,41 @@ function loadPersistentState() {
   if (roomCode) {
     state.roomCode = roomCode;
   }
+
+  if (routeMap) {
+    try {
+      state.routeMap = JSON.parse(routeMap);
+    } catch (err) {
+      logDebug('Failed to parse route map', err);
+    }
+  }
+  if (routeProgress) {
+    try {
+      state.routeProgress = JSON.parse(routeProgress) || [];
+      state.routeIndex = state.routeProgress.length;
+    } catch (err) {
+      logDebug('Failed to parse route progress', err);
+    }
+  }
+  if (routeCurrent) {
+    try {
+      state.routeCurrent = JSON.parse(routeCurrent);
+    } catch (err) {
+      logDebug('Failed to parse route current', err);
+    }
+  }
+
+  if (!state.routeMap && routeNodes) {
+    try {
+      const legacyNodes = JSON.parse(routeNodes) || [];
+      const migrated = buildLinearRouteMap(legacyNodes, state.routeIndex);
+      state.routeMap = migrated.map;
+      state.routeProgress = migrated.progress;
+      state.routeIndex = state.routeProgress.length;
+    } catch (err) {
+      logDebug('Failed to migrate legacy route nodes', err);
+    }
+  }
 }
 
 function resetRun() {
@@ -578,7 +620,10 @@ function resetRun() {
   state.heroMaxHp = 0;
   state.deck = [];
   state.routeIndex = 0;
-  state.routeNodes = [];
+  state.routeMap = null;
+  state.routeProgress = [];
+  state.routeCurrent = null;
+  state.routeSelection = null;
   state.runEffects = { openingBlock: 0, openingStrike: 0 };
   state.roomCode = null;
   state.pvp.role = null;
@@ -600,28 +645,192 @@ function getEnemyByTier(tier) {
   return pickRandom(pool) || pool[0] || null;
 }
 
-function buildRouteNodes() {
+function pickRandomDistinct(list, count) {
+  const available = [...list];
+  const picked = [];
+  while (available.length && picked.length < count) {
+    const index = Math.floor(Math.random() * available.length);
+    picked.push(available.splice(index, 1)[0]);
+  }
+  return picked;
+}
+
+function buildRouteMap() {
   const tier1 = ENEMY_DB.enemies.filter((enemy) => enemy.tier === 1);
   const tier2 = ENEMY_DB.enemies.filter((enemy) => enemy.tier === 2);
   const tier3 = ENEMY_DB.enemies.filter((enemy) => enemy.tier === 3);
   const eventPool = EVENT_LIBRARY.filter((event) => event.id !== 'camp');
-  const shuffledEvents = [...eventPool].sort(() => Math.random() - 0.5);
-  const eventA = shuffledEvents[0] || EVENT_LIBRARY[0];
-  const eventB = shuffledEvents[1] || eventA;
-  return [
-    { type: 'battle', enemyId: (pickRandom(tier1) || tier1[0] || getEnemyByTier(1))?.id },
-    { type: 'event', eventId: eventA.id },
-    { type: 'battle', enemyId: (pickRandom(tier2) || tier2[0] || getEnemyByTier(2))?.id },
-    { type: 'pvp' },
-    { type: 'event', eventId: 'camp' },
-    { type: 'battle', enemyId: (pickRandom(tier3) || tier3[0] || getEnemyByTier(3))?.id }
-  ].filter((node) => node.enemyId || node.type !== 'battle');
+
+  const floors = [];
+  const nodes = {};
+  const specs = [
+    { kind: 'battle', tier: 1, countRange: [2, 3] },
+    { kind: 'event', countRange: [2, 3] },
+    { kind: 'battle', tier: 2, countRange: [2, 3] },
+    { kind: 'mix', tier: 2, countRange: [2, 3] },
+    { kind: 'camp', countRange: [2, 3] },
+    { kind: 'battle', tier: 3, countRange: [1, 1] }
+  ];
+
+  const createNode = (payload) => {
+    const id = `node_${payload.floor}_${payload.column}_${Math.random().toString(36).slice(2, 7)}`;
+    const node = {
+      id,
+      type: payload.type,
+      floor: payload.floor,
+      column: payload.column,
+      enemyId: payload.enemyId || null,
+      eventId: payload.eventId || null,
+      next: []
+    };
+    nodes[id] = node;
+    return node;
+  };
+
+  specs.forEach((spec, floorIndex) => {
+    const [minCount, maxCount] = spec.countRange;
+    const nodeCount = minCount === maxCount ? minCount : minCount + Math.floor(Math.random() * (maxCount - minCount + 1));
+    const floorNodes = [];
+    let campPlaced = false;
+    for (let column = 0; column < nodeCount; column += 1) {
+      if (spec.kind === 'battle') {
+        const pool = spec.tier === 1 ? tier1 : spec.tier === 2 ? tier2 : tier3;
+        const enemy = pickRandom(pool) || pool[0] || getEnemyByTier(spec.tier);
+        if (!enemy) continue;
+        floorNodes.push(createNode({ floor: floorIndex, column, type: 'battle', enemyId: enemy.id }));
+      } else if (spec.kind === 'event') {
+        const event = pickRandom(eventPool) || EVENT_LIBRARY[0];
+        floorNodes.push(createNode({ floor: floorIndex, column, type: 'event', eventId: event?.id }));
+      } else if (spec.kind === 'mix') {
+        const usePvp = Math.random() < 0.35;
+        if (usePvp) {
+          floorNodes.push(createNode({ floor: floorIndex, column, type: 'pvp' }));
+        } else {
+          const enemy = pickRandom(tier2) || tier2[0] || getEnemyByTier(2);
+          if (!enemy) continue;
+          floorNodes.push(createNode({ floor: floorIndex, column, type: 'battle', enemyId: enemy.id }));
+        }
+      } else if (spec.kind === 'camp') {
+        if (!campPlaced && Math.random() < 0.5) {
+          campPlaced = true;
+          floorNodes.push(createNode({ floor: floorIndex, column, type: 'event', eventId: 'camp' }));
+        } else {
+          const event = pickRandom(eventPool) || EVENT_LIBRARY[0];
+          floorNodes.push(createNode({ floor: floorIndex, column, type: 'event', eventId: event?.id }));
+        }
+      }
+    }
+    if (spec.kind === 'camp' && !campPlaced && floorNodes.length) {
+      const target = pickRandom(floorNodes) || floorNodes[0];
+      if (target) {
+        target.type = 'event';
+        target.eventId = 'camp';
+      }
+    }
+    if (!floorNodes.length) {
+      const fallbackEvent = pickRandom(eventPool) || EVENT_LIBRARY[0];
+      floorNodes.push(createNode({ floor: floorIndex, column: 0, type: 'event', eventId: fallbackEvent?.id }));
+    }
+    floors.push(floorNodes);
+  });
+
+  for (let floorIndex = 0; floorIndex < floors.length - 1; floorIndex += 1) {
+    const current = floors[floorIndex];
+    const next = floors[floorIndex + 1];
+    const incoming = new Array(next.length).fill(0);
+    current.forEach((node, index) => {
+      const neighbors = next.map((_, idx) => idx).filter((idx) => {
+        if (next.length <= 2) return true;
+        return Math.abs(idx - index) <= 1;
+      });
+      const linkCount = Math.random() < 0.65 ? 1 : 2;
+      const chosen = pickRandomDistinct(neighbors, Math.min(linkCount, neighbors.length));
+      node.next = chosen.map((idx) => next[idx].id);
+      chosen.forEach((idx) => {
+        incoming[idx] += 1;
+      });
+    });
+    next.forEach((node, idx) => {
+      if (incoming[idx] > 0) return;
+      const source = current.reduce(
+        (closest, candidate, candidateIdx) => {
+          const distance = Math.abs(candidateIdx - idx);
+          if (!closest || distance < closest.distance) {
+            return { node: candidate, distance };
+          }
+          return closest;
+        },
+        null
+      );
+      if (source?.node) {
+        source.node.next = Array.from(new Set([...(source.node.next || []), node.id]));
+      }
+    });
+  }
+
+  return { floors, nodes };
 }
 
-function ensureRouteNodes() {
-  if (!state.routeNodes.length) {
-    state.routeNodes = buildRouteNodes();
+function buildLinearRouteMap(legacyNodes, legacyIndex = 0) {
+  if (!legacyNodes.length) {
+    return { map: buildRouteMap(), progress: [] };
   }
+  const floors = [];
+  const nodes = {};
+  legacyNodes.forEach((legacy, index) => {
+    const node = {
+      id: `legacy_${index}`,
+      type: legacy.type,
+      floor: index,
+      column: 0,
+      enemyId: legacy.enemyId || null,
+      eventId: legacy.eventId || null,
+      next: []
+    };
+    floors.push([node]);
+    nodes[node.id] = node;
+  });
+  floors.forEach((floorNodes, index) => {
+    if (index < floors.length - 1) {
+      floorNodes[0].next = [floors[index + 1][0].id];
+    }
+  });
+  const progress = [];
+  const cappedIndex = Math.min(legacyIndex, floors.length);
+  for (let i = 0; i < cappedIndex; i += 1) {
+    progress.push(floors[i][0].id);
+  }
+  return { map: { floors, nodes }, progress };
+}
+
+function ensureRouteMap() {
+  if (!state.routeMap) {
+    state.routeMap = buildRouteMap();
+    state.routeProgress = [];
+    state.routeCurrent = null;
+    state.routeSelection = null;
+  }
+}
+
+function getRouteNodeById(nodeId) {
+  if (!state.routeMap || !nodeId) return null;
+  return state.routeMap.nodes?.[nodeId] || null;
+}
+
+function getAvailableRouteNodes() {
+  ensureRouteMap();
+  if (state.routeCurrent) return [];
+  if (!state.routeProgress.length) {
+    return state.routeMap.floors[0] || [];
+  }
+  const lastNode = getRouteNodeById(state.routeProgress[state.routeProgress.length - 1]);
+  if (!lastNode) return [];
+  return (lastNode.next || []).map((id) => getRouteNodeById(id)).filter(Boolean);
+}
+
+function setRouteSelection(nodeId) {
+  state.routeSelection = nodeId;
+  updateRouteUI();
 }
 
 function describeRouteNode(node) {
@@ -640,19 +849,121 @@ function describeRouteNode(node) {
   return 'Неизвестный узел';
 }
 
-function renderRouteNodes() {
+function renderRouteNodes(availableNodes) {
   const container = document.getElementById('routeNodes');
   container.innerHTML = '';
-  state.routeNodes.forEach((node, index) => {
+  if (!availableNodes.length) {
+    const empty = document.createElement('p');
+    empty.className = 'muted';
+    empty.textContent = 'Маршрут завершён. Выберите новый забег.';
+    container.appendChild(empty);
+    return;
+  }
+  availableNodes.forEach((node) => {
     const button = document.createElement('button');
     button.className = 'route-node';
-    button.dataset.node = String(index);
-    button.textContent = `${index + 1}. ${describeRouteNode(node)}`;
+    button.dataset.nodeId = node.id;
+    button.innerHTML = `
+      <strong>${describeRouteNode(node)}</strong>
+      <span class="route-node-meta">Этаж ${node.floor + 1}</span>
+    `;
+    button.classList.toggle('selected', node.id === state.routeSelection);
     button.addEventListener('click', () => {
-      handleRouteNode(index);
+      setRouteSelection(node.id);
     });
     container.appendChild(button);
   });
+}
+
+function getRouteNodePosition(map, nodeId) {
+  const node = map.nodes?.[nodeId];
+  if (!node) return null;
+  const floor = map.floors[node.floor] || [];
+  const count = floor.length || 1;
+  const x = ((node.column + 1) / (count + 1)) * 100;
+  const totalFloors = Math.max(map.floors.length - 1, 1);
+  const y = (node.floor / totalFloors) * 100;
+  return { x, y };
+}
+
+function renderRouteMap(containerId, options = {}) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+  ensureRouteMap();
+  const map = state.routeMap;
+  container.innerHTML = '';
+
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('viewBox', '0 0 100 100');
+  svg.classList.add('route-map-lines');
+
+  const completedSet = new Set(state.routeProgress);
+  const availableNodes = getAvailableRouteNodes();
+  const availableSet = new Set(availableNodes.map((node) => node.id));
+
+  map.floors.forEach((floor) => {
+    floor.forEach((node) => {
+      const start = getRouteNodePosition(map, node.id);
+      if (!start) return;
+      (node.next || []).forEach((nextId) => {
+        const end = getRouteNodePosition(map, nextId);
+        if (!end) return;
+        const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        line.setAttribute('x1', start.x);
+        line.setAttribute('y1', start.y);
+        line.setAttribute('x2', end.x);
+        line.setAttribute('y2', end.y);
+        const isCompleted = completedSet.has(node.id) && completedSet.has(nextId);
+        line.classList.add('route-map-line');
+        if (isCompleted) {
+          line.classList.add('completed');
+        }
+        svg.appendChild(line);
+      });
+    });
+  });
+
+  container.appendChild(svg);
+
+  map.floors.forEach((floor) => {
+    floor.forEach((node) => {
+      const position = getRouteNodePosition(map, node.id);
+      if (!position) return;
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'route-map-node';
+      button.style.left = `${position.x}%`;
+      button.style.top = `${position.y}%`;
+      button.textContent = node.type === 'battle' ? '⚔️' : node.type === 'event' ? '✨' : '⚖️';
+      button.title = describeRouteNode(node);
+      if (completedSet.has(node.id)) {
+        button.classList.add('completed');
+      }
+      if (node.id === state.routeCurrent) {
+        button.classList.add('current');
+      }
+      if (availableSet.has(node.id)) {
+        button.classList.add('available');
+      }
+      if (node.id === state.routeSelection) {
+        button.classList.add('selected');
+      }
+      if (options.interactive && availableSet.has(node.id)) {
+        button.addEventListener('click', () => {
+          setRouteSelection(node.id);
+        });
+      } else {
+        button.disabled = true;
+      }
+      container.appendChild(button);
+    });
+  });
+}
+
+function renderRouteMaps() {
+  renderRouteMap('routeMap', { interactive: state.screen === 'route' });
+  renderRouteMap('battleRouteMap');
+  renderRouteMap('eventRouteMap');
 }
 
 function formatRunEffects() {
@@ -672,34 +983,33 @@ function formatRunEffects() {
 function updateRouteUI() {
   document.getElementById('routeRoomCode').textContent = state.roomCode || '—';
   const info = document.getElementById('routeInfo');
-  ensureRouteNodes();
-  renderRouteNodes();
-  const totalNodes = state.routeNodes.length;
-  if (state.routeIndex >= totalNodes) {
+  ensureRouteMap();
+  state.routeIndex = state.routeProgress.length;
+  const totalNodes = state.routeMap.floors.length;
+  const availableNodes = getAvailableRouteNodes();
+  if (!availableNodes.some((node) => node.id === state.routeSelection)) {
+    state.routeSelection = availableNodes[0]?.id || null;
+  }
+  renderRouteNodes(availableNodes);
+  if (state.routeProgress.length >= totalNodes) {
     info.textContent = 'Маршрут завершён. Можно начать заново или заняться PvP.';
   } else {
-    const progress = Math.min(state.routeIndex + 1, totalNodes);
+    const progress = Math.min(state.routeProgress.length + 1, totalNodes);
     info.textContent = `Текущий прогресс: узел ${progress} из ${totalNodes}.`;
   }
-  const buttons = document.querySelectorAll('#routeNodes .route-node');
-  buttons.forEach((btn) => {
-    const nodeIndex = Number(btn.dataset.node);
-    const isActive = nodeIndex === state.routeIndex;
-    btn.disabled = !isActive;
-    btn.classList.toggle('active', isActive);
-    btn.classList.toggle('completed', nodeIndex < state.routeIndex);
-  });
   const nextLabel = document.getElementById('routeNextLabel');
   if (nextLabel) {
-    if (state.routeIndex >= totalNodes) {
+    if (state.routeProgress.length >= totalNodes) {
       nextLabel.textContent = 'Маршрут завершён.';
+    } else if (state.routeSelection) {
+      nextLabel.textContent = describeRouteNode(getRouteNodeById(state.routeSelection));
     } else {
-      nextLabel.textContent = describeRouteNode(state.routeNodes[state.routeIndex]);
+      nextLabel.textContent = 'Выберите следующий узел на карте.';
     }
   }
   const nextButton = document.getElementById('btnRouteNext');
   if (nextButton) {
-    nextButton.disabled = state.routeIndex >= totalNodes;
+    nextButton.disabled = state.routeProgress.length >= totalNodes || !state.routeSelection;
   }
   const status = document.getElementById('routeStatus');
   if (status) {
@@ -710,6 +1020,7 @@ function updateRouteUI() {
       <div class="muted">${formatRunEffects()}</div>
     `;
   }
+  renderRouteMaps();
 }
 
 // WebSocket ---------------------------------------------------------------
@@ -849,7 +1160,7 @@ function continueGame() {
     setFooterMessage('Нет сохранённого приключения.');
     return;
   }
-  ensureRouteNodes();
+  ensureRouteMap();
   state.heroHp = state.heroHp || HEROES[state.heroId].hp;
   state.heroMaxHp = HEROES[state.heroId].hp;
   showScreen('route');
@@ -869,7 +1180,10 @@ function finalizeHeroSelection() {
   state.heroMaxHp = hero.hp;
   state.deck = hero.deck.map(createCardInstance);
   state.routeIndex = 0;
-  state.routeNodes = buildRouteNodes();
+  state.routeMap = buildRouteMap();
+  state.routeProgress = [];
+  state.routeCurrent = null;
+  state.routeSelection = null;
   state.runEffects = { openingBlock: 0, openingStrike: 0 };
   savePersistentState();
   document.getElementById('btnContinue').disabled = false;
@@ -1063,6 +1377,7 @@ function openEvent(title, description, options) {
     container.appendChild(card);
   });
   showScreen('event');
+  renderRouteMaps();
 }
 
 function openEventById(eventId) {
@@ -1074,8 +1389,15 @@ function openEventById(eventId) {
   openEvent(event.title, event.description, event.buildOptions());
 }
 
-function closeEvent() {
+function closeEvent(options = {}) {
+  const { keepRouteCurrent = false } = options;
+  if (!keepRouteCurrent && state.routeCurrent && !state.routeProgress.includes(state.routeCurrent)) {
+    state.routeCurrent = null;
+    state.routeSelection = null;
+    savePersistentState();
+  }
   showScreen('route');
+  updateRouteUI();
 }
 
 // Deck management ---------------------------------------------------------
@@ -1241,6 +1563,7 @@ function renderBattle() {
   renderPlayerSlots();
   renderOpponentSlots();
   renderCardPool();
+  renderRouteMaps();
 }
 
 function renderPlayerSlots() {
@@ -1794,9 +2117,17 @@ function repeatBattle() {
 }
 
 // Route node handlers -----------------------------------------------------
-function handleRouteNode(nodeIndex) {
-  const node = state.routeNodes[nodeIndex];
-  if (!node || nodeIndex !== state.routeIndex) return;
+function handleRouteNode(nodeId) {
+  const node = getRouteNodeById(nodeId);
+  const availableNodes = getAvailableRouteNodes();
+  const isAvailable = availableNodes.some((entry) => entry.id === nodeId);
+  if (!node || !isAvailable) {
+    setFooterMessage('Выберите доступный узел маршрута.');
+    return;
+  }
+  state.routeCurrent = node.id;
+  state.routeSelection = node.id;
+  savePersistentState();
   switch (node.type) {
     case 'battle':
       startPveBattle(node.enemyId, 'campaign');
@@ -1821,7 +2152,7 @@ function openPvpEvent() {
         text: 'Настоящее вторжение через зеркало.',
         button: 'Войти в PvP',
         action: () => {
-          closeEvent();
+          closeEvent({ keepRouteCurrent: true });
           startPvPNode();
         }
       },
@@ -1829,7 +2160,7 @@ function openPvpEvent() {
         text: 'Если нет соперника, можно сразиться с отражением.',
         button: 'Сразиться с фантомом',
         action: () => {
-          closeEvent();
+          closeEvent({ keepRouteCurrent: true });
           const foe = getEnemyByTier(2) || ENEMY_DB.enemies[0];
           if (foe) {
             startPveBattle(foe.id, 'campaign');
@@ -1858,13 +2189,18 @@ function openLootEvent() {
 }
 
 function updateRouteAfterEvent() {
-  closeEvent();
+  closeEvent({ keepRouteCurrent: true });
   advanceRoute();
 }
 
 function advanceRoute() {
-  const total = state.routeNodes.length;
-  state.routeIndex = Math.min(state.routeIndex + 1, total);
+  if (!state.routeCurrent) return;
+  if (!state.routeProgress.includes(state.routeCurrent)) {
+    state.routeProgress.push(state.routeCurrent);
+  }
+  state.routeIndex = state.routeProgress.length;
+  state.routeCurrent = null;
+  state.routeSelection = null;
   savePersistentState();
   updateRouteUI();
 }
@@ -1927,13 +2263,18 @@ function setupButtons() {
     showScreen('start');
   });
   document.getElementById('btnRouteNext').addEventListener('click', () => {
-    handleRouteNode(state.routeIndex);
+    if (!state.routeSelection) {
+      setFooterMessage('Выберите следующий узел маршрута.');
+      return;
+    }
+    handleRouteNode(state.routeSelection);
   });
   document.getElementById('btnEventBack').addEventListener('click', closeEvent);
   document.getElementById('btnBattleReset').addEventListener('click', resetPlayerSlots);
   document.getElementById('btnBattleConfirm').addEventListener('click', confirmBattleSlots);
   document.getElementById('btnBattleExit').addEventListener('click', () => {
     showScreen('route');
+    updateRouteUI();
   });
   document.getElementById('btnResultMenu').addEventListener('click', () => {
     showScreen('start');

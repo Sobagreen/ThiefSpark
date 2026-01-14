@@ -247,6 +247,11 @@ button.primary:not(:disabled):hover {
   box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.25);
 }
 
+.route-node.selected {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.35);
+}
+
 .route-node.completed {
   background: rgba(74, 222, 128, 0.12);
   border-color: rgba(74, 222, 128, 0.45);
@@ -254,6 +259,98 @@ button.primary:not(:disabled):hover {
 
 .route-node:disabled {
   opacity: 0.5;
+}
+
+.route-node-meta {
+  display: block;
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.route-map-panel {
+  margin-top: 24px;
+  padding: 16px;
+  border-radius: 16px;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  background: rgba(15, 23, 42, 0.65);
+}
+
+.route-map-panel h3,
+.route-map-panel h4 {
+  margin-top: 0;
+  margin-bottom: 12px;
+}
+
+.route-map-panel.compact {
+  margin-top: 16px;
+  padding: 12px;
+}
+
+.route-map {
+  position: relative;
+  min-height: 220px;
+  border-radius: 14px;
+  background: rgba(30, 41, 59, 0.6);
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  overflow: hidden;
+}
+
+.route-map.compact {
+  min-height: 160px;
+}
+
+.route-map-lines {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.route-map-line {
+  stroke: rgba(148, 163, 184, 0.6);
+  stroke-width: 1.6;
+}
+
+.route-map-line.completed {
+  stroke: rgba(74, 222, 128, 0.7);
+}
+
+.route-map-node {
+  position: absolute;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 1px solid rgba(148, 163, 184, 0.55);
+  background: rgba(15, 23, 42, 0.95);
+  color: var(--text);
+  display: grid;
+  place-items: center;
+  font-size: 16px;
+  transform: translate(-50%, -50%);
+}
+
+.route-map-node.available {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.25);
+}
+
+.route-map-node.selected {
+  background: rgba(56, 189, 248, 0.2);
+}
+
+.route-map-node.completed {
+  background: rgba(74, 222, 128, 0.25);
+  border-color: rgba(74, 222, 128, 0.65);
+}
+
+.route-map-node.current {
+  box-shadow: 0 0 0 2px rgba(248, 250, 252, 0.35);
+}
+
+.route-map-node:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
 }
 
 .field {
